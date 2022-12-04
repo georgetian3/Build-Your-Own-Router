@@ -46,7 +46,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     // FILL THIS IN
 
     print_hdr_eth(packet.data());
-    const ethernet_hdr* ether_hdr = (const ethernet_hdr *)packet.data();
+    ethernet_hdr* ether_hdr = (ethernet_hdr *)packet.data();
 
     /* Your router must ignore Ethernet frames not destined to the router, i.e., when destination hard-
     ware address is neither the corresponding MAC address of the interface nor a broadcast address
@@ -61,13 +61,13 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     packets. */
 
 
-    const uint8_t* ether_payload = reinterpret_cast<const uint8_t*>(packet.data() + sizeof(ethernet_hdr));
+    uint8_t* ether_payload = reinterpret_cast<uint8_t*>(packet.data() + sizeof(ethernet_hdr));
 
     // Your router should ignore Ethernet frames other than ARP and IPv4.
     int ether_type = ntohs(ether_hdr->ether_type);
     if (ether_type == ethertype_arp) {
 
-        const arp_hdr* arp_hdr = reinterpret_cast<const arp_hdr*>(ether_payload);
+        arp_hdr* arp_hdr = reinterpret_cast<arp_hdr*>(ether_payload);
         print_hdr_arp(ether_payload);
 
 
