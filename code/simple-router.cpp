@@ -179,8 +179,8 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
                     printf("TTL = 0\n");
                     ICMP2 icmp;
                     #define ICMP_TIME_EXCEEDED 11
-                    icmp.icmp_type = ICMP_TIME_EXCEEDED;
-                    icmp.icmp_code = 0;
+                    icmp.type = ICMP_TIME_EXCEEDED;
+                    icmp.code = 0;
                     memcpy(icmp.data, ip_h, sizeof(ip_hdr));
                     memcpy(icmp.data + sizeof(ip_hdr), ip_data.data(), 64); 
                     return;
