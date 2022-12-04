@@ -95,11 +95,11 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
             arp->arp_tip = arp->arp_sip;
             mac_cpy(arp->arp_tha, arp->arp_sha);
             arp->arp_sip = iface->ip;
-            copy_mac_addr(arp_hdr->arp_sha, iface->addr);
+            mac_cpy(arp->arp_sha, iface->addr);
 
 
             memcpy(ether_payload, arp, sizeof(arp_hdr));
-            sendPacket(packet, iface);
+            sendPacket(packet, inIface);
             return;
         }
         
