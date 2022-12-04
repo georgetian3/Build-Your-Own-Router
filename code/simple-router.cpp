@@ -20,6 +20,9 @@
 #include <fstream>
 
 
+void copy_mac_addr(const uint8_t* dst, const uint8_t* src) {
+    memcpy(dst, src, ETHER_ADDR_LEN);
+}
 
 
 namespace simple_router {
@@ -70,8 +73,6 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
         arp_hdr* arp_hdr = reinterpret_cast<arp_hdr*>(ether_payload);
         print_hdr_arp(ether_payload);
 
-
-
         if (arp_hdr->arp_op == arp_op_request) {
 
             /* Must ignore other ARP requests */
@@ -83,18 +84,19 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
             /* Must properly respond to ARP requests for MAC address for the IP address of the correspond-
             ing network interface */
 
-            ether_hdr->ether_shost = iface->addr;
-            ether_hdr->ether_dhost = arp_hdr->arp_sha;
+            copy_mac_addr(ether_hdr->ether_shost, iface->addr.data());
+            copy_mac_addr(ether_hdr->ether_dhost, arp_hdr->arp_sha);
 
             arp_hdr->arp_op = arp_op_reply;
             arp_hdr->arp_tip = arp_hdr->arp_sip;
-            arp_hdr->arp_tha = arp_hdr->arp_tha;
+            copy_mac_addr(arp_hdr->arp_tha, arp_hdr->arp_sha);
             arp_hdr->arp_sip = iface->ip;
-            arp_hdr->arp_sha = iface->addr;
+            copy_mac_addr(arp_hdr->arp_sha, iface->addr);
+
 
             memcpy(ether_payload, arp_hdr, sizeof(arp_hdr));
             sendPacket(packet, iface);
-
+            return;
         }
         
         else if (arp_hdr->arp_op == arp_op_reply) {
@@ -103,6 +105,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
             corresponding enqueued packets. */
             // TODO: handle request
             std::shared_ptr<ArpRequest> request = insertArpEntry(arp_hdr->arp_sha, arp_hdr->arp_sip);
+
         }
     } else if (ether_type == ethertype_ip) {
         const ip_hdr* ip_hdr = reinterpret_cast<const ip_hdr*>(ether_payload);
