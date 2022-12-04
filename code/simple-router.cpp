@@ -99,7 +99,6 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
             mac_cpy(arp->arp_sha, iface->addr.data());
 
 
-            memcpy(ether_payload, arp, sizeof(arp_hdr));
             sendPacket(packet, inIface);
             return;
         }
