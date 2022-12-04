@@ -61,21 +61,22 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     const uint8_t broadcast_address[ETHER_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     if (!mac_eq(ether_hdr->ether_dhost, broadcast_address) ||
         !mac_eq(ether_hdr->ether_dhost, iface->addr.data())) {
+        
+        printf("Ignoring ethernet frame\n");
         return;
     }
 
     /* Your router must appropriately dispatch Ethernet frames (their payload) carrying ARP and IPv4
     packets. */
 
-
-    uint8_t* ether_payload = const_cast<uint8_t*>(packet.data()) + sizeof(ethernet_hdr);
+    Buffer ether_data(packet.begin() + sizeof(ether_hdr), packet.end());
 
     // Your router should ignore Ethernet frames other than ARP and IPv4.
     int ether_type = ntohs(ether_hdr->ether_type);
     if (ether_type == ethertype_arp) {
 
-        arp_hdr* arp = reinterpret_cast<arp_hdr*>(ether_payload);
-        print_hdr_arp(ether_payload);
+        arp_hdr* arp = (arp_hdr)ether_data.data();
+        print_hdr_arp(arp);
 
         if (arp->arp_op == arp_op_request) {
 
@@ -130,7 +131,9 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
             }
         #pragma endregion 
         #pragma region // verify checksum
-        ip_hdr* ip_h = reinterpret_cast<ip_hdr*>(ether_payload);
+        ip_hdr* ip_h = (ip_hdr*)ether_data.data();
+        print_hdr_ip(ip_h);
+
         uint16_t checksum = cksum(ip_h, sizeof(ip_hdr));
         if (checksum != 0) {
             printf("IP checksum incorrect\n");
@@ -138,12 +141,22 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
         }
         #pragma endregion
 
+        std::vector<uint8_t> ip_data(ether_data.begin() + sizeof(ip_hdr), ether_data.end());
 
         /* Your router should classify datagrams into (1) destined to the router (to one of the IP addresses of
         the router), and (2) datagrams to be forwarded: */
         if (ip_h->ip_dst == iface->ip) {
             /* For (1), if packet carries ICMP payload, it should be properly dispatched. Otherwise, discarded
             (a proper ICMP error response is NOT required for this project). */
+
+            if (ip_h->ip_tos != ip_protocol_icmp) {
+                printf("Received non-ICMP payload\n");
+                return;
+            }
+
+            printf("Received ICMP payload\n");
+
+            #pragma region //
         }
         else {
             /* For (2), your router should use the longest prefix match algorithm to find a next-hop IP ad-
@@ -161,14 +174,22 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
             /* For each forwarded IPv4 packet, your router should correctly decrement TTL and recompute the
             checksum. */
-            #pragma region decrement_TTL
+            #pragma region // decrement TTL
                 // Don't forward if TTL = 0
                 if (ip_h->ip_ttl == 0) {
+                    printf("TTL = 0\n");
+                    ICMP icmp;
+                    #define ICMP_TIME_EXCEEDED 11
+                    icmp.icmp_type = ICMP_TIME_EXCEEDED;
+                    icmp.icmp_code = 0;
+                    memcpy(icmp.data, ip_h, sizeof(ip_hdr));
+                    memcpy(icmp.data + sizeof(ip_hdr), 
                     return;
                 }
+                printf("Decrementing TTL\n");
                 ip_h->ip_ttl -= 1;
             #pragma endregion
-            #pragma region decrement_TTL
+            #pragma region // recompute checksum
                 // copy header excluding old checksum
                 #define HDR_LESS_CKSUM_LEN 18
                 uint8_t* hdr_less_cksum[HDR_LESS_CKSUM_LEN];
@@ -184,8 +205,13 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
             #pragma endregion
         
 
+            std::shared_ptr<ArpEntry> arp_entry = m_arp.lookup(next_hop.dest);
+            if (arp_entry == nullptr) {
+                ;
+            } else {
+                mac_cpy(ether_hdr->ether_dhost, arp_entry->mac);
+            }
             mac_cpy(ether_hdr->ether_shost, iface->addr.data());
-            mac_cpy(ether_hdr->ether_dhost, next_hop.dest);
 
             sendPacket(packet, next_hop.ifName);
 
