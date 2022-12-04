@@ -75,7 +75,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     int ether_type = ntohs(ether_hdr->ether_type);
     if (ether_type == ethertype_arp) {
 
-        arp_hdr* arp = (arp_hdr)ether_data.data();
+        arp_hdr* arp = (arp_hdr*)ether_data.data();
         print_hdr_arp((uint8_t*)arp);
 
         if (arp->arp_op == arp_op_request) {

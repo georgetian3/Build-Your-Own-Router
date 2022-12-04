@@ -75,19 +75,7 @@ struct icmp_t3_hdr {
   uint8_t data[ICMP_DATA_SIZE];
 } __attribute__ ((packed)) ;
 
-////////////////////////////////////////////////////
-// ADDED
 
-struct ICMP2 {
-  uint8_t type;
-  uint8_t code;
-  uint16_t cksum;
-  uint16_t id;
-  uint16_t seq;
-  uint8_t data[sizeof(ip_hdr + 64)]; //  Internet Header + 64 bits of Original Data Datagram
-} __attribute__ ((packed));
-
-///////////////////////////////////////////////////
 
 /*
  * Structure of the IP header, naked of options.
@@ -117,6 +105,19 @@ struct ip_hdr
   uint32_t ip_src, ip_dst;         /* source and dest address */
 } __attribute__ ((packed)) ;
 
+////////////////////////////////////////////////////
+// ADDED
+
+struct ICMP2 {
+  uint8_t type;
+  uint8_t code;
+  uint16_t cksum;
+  uint16_t id;
+  uint16_t seq;
+  uint8_t data[sizeof(ip_hdr) + 64]; //  Internet Header + 64 bits of Original Data Datagram
+} __attribute__ ((packed));
+
+///////////////////////////////////////////////////
 
 /*
  *  Ethernet packet header prototype.  Too many O/S's define this differently.
