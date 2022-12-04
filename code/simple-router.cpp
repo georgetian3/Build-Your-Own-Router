@@ -20,7 +20,7 @@
 #include <fstream>
 
 
-void mac_cpy(const uint8_t* dst, const uint8_t* src) {
+void mac_cpy(uint8_t* dst, const uint8_t* src) {
     memcpy(dst, src, ETHER_ADDR_LEN);
 }
 
@@ -68,20 +68,20 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     packets. */
 
 
-    uint8_t* ether_payload = reinterpret_cast<uint8_t*>(packet.data() + sizeof(ethernet_hdr));
+    uint8_t* ether_payload = reinterpret_cast<uint8_t*>(packet.data() + (uint8_t*)sizeof(ethernet_hdr));
 
     // Your router should ignore Ethernet frames other than ARP and IPv4.
     int ether_type = ntohs(ether_hdr->ether_type);
     if (ether_type == ethertype_arp) {
 
-        arp_hdr* arp_hdr = reinterpret_cast<arp_hdr*>(ether_payload);
+        arp_hdr* arp = reinterpret_cast<arp_hdr*>(ether_payload);
         print_hdr_arp(ether_payload);
 
-        if (arp_hdr->arp_op == arp_op_request) {
+        if (arp->arp_op == arp_op_request) {
 
             /* Must ignore other ARP requests */
             // drop ARP requests whose target HW addr does not match this interface
-            if (!mac_eq(arp_hdr->arp_tha, iface->addr.data())) {
+            if (!mac_eq(arp->arp_tha, iface->addr.data())) {
                 return;
             }
             
@@ -89,26 +89,26 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
             ing network interface */
 
             mac_cpy(ether_hdr->ether_shost, iface->addr.data());
-            mac_cpy(ether_hdr->ether_dhost, arp_hdr->arp_sha);
+            mac_cpy(ether_hdr->ether_dhost, arp->arp_sha);
 
-            arp_hdr->arp_op = arp_op_reply;
-            arp_hdr->arp_tip = arp_hdr->arp_sip;
-            mac_cpy(arp_hdr->arp_tha, arp_hdr->arp_sha);
-            arp_hdr->arp_sip = iface->ip;
+            arp->arp_op = arp_op_reply;
+            arp->arp_tip = arp->arp_sip;
+            mac_cpy(arp->arp_tha, arp->arp_sha);
+            arp->arp_sip = iface->ip;
             copy_mac_addr(arp_hdr->arp_sha, iface->addr);
 
 
-            memcpy(ether_payload, arp_hdr, sizeof(arp_hdr));
+            memcpy(ether_payload, arp, sizeof(arp_hdr));
             sendPacket(packet, iface);
             return;
         }
         
-        else if (arp_hdr->arp_op == arp_op_reply) {
+        else if (arp->arp_op == arp_op_reply) {
             /* When router receives an ARP reply, it should record IP-MAC mapping information in ARP cache
             (Source IP/Source hardware address in the ARP reply). Afterwards, the router should send out all
             corresponding enqueued packets. */
             // TODO: handle request
-            std::shared_ptr<ArpRequest> request = insertArpEntry(arp_hdr->arp_sha, arp_hdr->arp_sip);
+            std::shared_ptr<ArpRequest> request = insertArpEntry(arp->arp_sha, arp->arp_sip);
 
         }
     } else if (ether_type == ethertype_ip) {
