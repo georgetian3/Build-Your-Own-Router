@@ -51,6 +51,7 @@ RoutingTable::lookup(uint32_t ip) const
         throw std::runtime_error("Routing entry not found");
     }
     return *longest_prefix_string;
+
 }
     
 //////////////////////////////////////////////////////////////////////////

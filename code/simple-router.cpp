@@ -27,17 +27,30 @@ namespace simple_router {
 void
 SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 {
-  std::cerr << "Got packet of size " << packet.size() << " on interface " << inIface << std::endl;
+    std::cerr << "Got packet of size " << packet.size() << " on interface " << inIface << std::endl;
 
-  const Interface* iface = findIfaceByName(inIface);
-  if (iface == nullptr) {
-    std::cerr << "Received packet, but interface is unknown, ignoring" << std::endl;
-    return;
-  }
+    const Interface* iface = findIfaceByName(inIface);
+    if (iface == nullptr) {
+        std::cerr << "Received packet, but interface is unknown, ignoring" << std::endl;
+        return;
+    }
 
-  std::cerr << getRoutingTable() << std::endl;
+    std::cerr << getRoutingTable() << std::endl;
 
-  // FILL THIS IN
+    // FILL THIS IN
+
+    ethernet_hdr hdr = static_cast<ethernet_hdr>(packet.begin(), packet.begin() + sizeof(ethernet_hdr));
+
+    // Your router should ignore Ethernet frames other than ARP and IPv4.
+    if (ethertype(packet) != ethertype_arp || ethertype(packet) != ethertype_ip) {
+        return;
+    }
+
+    /* Your router must ignore Ethernet frames not destined to the router, i.e., when destination hard-
+    ware address is neither the corresponding MAC address of the interface nor a broadcast address
+    ( FF:FF:FF:FF:FF:FF ). */
+    int
+
 
 }
 //////////////////////////////////////////////////////////////////////////
