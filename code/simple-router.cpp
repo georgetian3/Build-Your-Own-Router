@@ -112,7 +112,85 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
         }
     } else if (ether_type == ethertype_ip) {
+
+        ////////////////////////////////////////// BEGIN 2.3 IPv4 PACKETS ////////////////////////////////////////////////
+
+        /* For each incoming IPv4 packet, your router should verify its checksum and the minimum length of
+        an IP packet
+        – Invalid packets must be discarded (a proper ICMP error response is NOT required for this
+        project). */
+        #pragma region // verify minimum length
+            #ifndef IP_MINPACKET
+                #define IP_MINPACKET sizeof(ip_hdr) // min packet length is simply length of header with no options
+            #endif
+            int packet_length = packet.size() - sizeof(ether_hdr);
+            if (packet_length < IP_MINPACKET) {
+                printf("IP too short\n");
+                return;
+            }
+        #pragma endregion 
+        #pragma region // verify checksum
         ip_hdr* ip_h = reinterpret_cast<ip_hdr*>(ether_payload);
+        uint16_t checksum = cksum(ip_h, sizeof(ip_hdr));
+        if (checksum != 0) {
+            printf("IP checksum incorrect\n");
+            return;
+        }
+        #pragma endregion
+
+
+        /* Your router should classify datagrams into (1) destined to the router (to one of the IP addresses of
+        the router), and (2) datagrams to be forwarded: */
+        if (ip_h->ip_dst == iface->ip) {
+            /* For (1), if packet carries ICMP payload, it should be properly dispatched. Otherwise, discarded
+            (a proper ICMP error response is NOT required for this project). */
+        }
+        else {
+            /* For (2), your router should use the longest prefix match algorithm to find a next-hop IP ad-
+            dress in the routing table and attempt to forward it there */
+
+            #pragma region // find next-hop
+                RoutingTableEntry next_hop;
+                try {
+                    next_hop = m_routingTable.lookup(ip_h->ip_dst);
+                } catch (...) {
+                    printf("Lookup failed\n");
+                    return;
+                }
+            #pragma endregion
+
+            /* For each forwarded IPv4 packet, your router should correctly decrement TTL and recompute the
+            checksum. */
+            #pragma region // decrement TTL
+                // Don't forward if TTL = 0
+                if (ip_h->ip_ttl = 0) {
+                    return;
+                }
+                ip_h->ip_ttl -= 1;
+            #pragma endregion
+            #pragma region // recompute checksum
+                // copy header excluding old checksum
+                #define HDR_LESS_CKSUM_LEN 18
+                uint8_t* hdr_less_cksum[HDR_LESS_CKSUM_LEN];
+                #define BYTES_BEFORE_CKSUM 9
+                #define BYTES_AFTER_CKSUM 8
+                memcpy(hdr_less_cksum, ip_h, BYTES_BEFORE_CKSUM);
+                memcpy(hdr_less_cksum + BYTES_BEFORE_CKSUM + sizeof(ip_h->ip_sum),
+                    ip_h + BYTES_BEFORE_CKSUM + sizeof(ip_h->ip_sum),
+                    BYTES_AFTER_CKSUM
+                );
+                // recalculate checksum and assign to original header
+                ip_h->ip_sum = cksum(hdr_less_cksum, HDR_LESS_CKSUM_LEN);
+            #pragma endregion
+        
+            mac_cpy(ether_hdr->ether_shost, iface->addr.data());
+            mac_cpy(ether_hdr->ether_dhost, next_hop.dest);
+
+            sendPacket(packet, next_hop.ifName);
+
+        }
+        ////////////////////////////////////////// END 2.3 IPv4 PACKETS ////////////////////////////////////////////////
+
 
     }
 
