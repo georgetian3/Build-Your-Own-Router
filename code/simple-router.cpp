@@ -20,8 +20,12 @@
 #include <fstream>
 
 
-void copy_mac_addr(const uint8_t* dst, const uint8_t* src) {
+void mac_cpy(const uint8_t* dst, const uint8_t* src) {
     memcpy(dst, src, ETHER_ADDR_LEN);
+}
+
+bool mac_eq(const uint8_t* a, const uint8_t* b) {
+    return memcmp(a, b, ETHER_ADDR_LEN);
 }
 
 
@@ -55,8 +59,8 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     ware address is neither the corresponding MAC address of the interface nor a broadcast address
     ( FF:FF:FF:FF:FF:FF ). */
     const uint8_t broadcast_address[ETHER_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-    if (memcmp(ether_hdr->ether_dhost, broadcast_address , ETHER_ADDR_LEN) &&
-        memcmp(ether_hdr->ether_dhost, iface->addr.data(), ETHER_ADDR_LEN)) {
+    if (!mac_eq(ether_hdr->ether_dhost, broadcast_address) ||
+        !mac_eq(ether_hdr->ether_dhost, iface->addr.data())) {
         return;
     }
 
@@ -77,19 +81,19 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
             /* Must ignore other ARP requests */
             // drop ARP requests whose target HW addr does not match this interface
-            if (arp_hdr->arp_tha != iface->addr) {
+            if (!mac_eq(arp_hdr->arp_tha, iface->addr.data())) {
                 return;
             }
             
             /* Must properly respond to ARP requests for MAC address for the IP address of the correspond-
             ing network interface */
 
-            copy_mac_addr(ether_hdr->ether_shost, iface->addr.data());
-            copy_mac_addr(ether_hdr->ether_dhost, arp_hdr->arp_sha);
+            mac_cpy(ether_hdr->ether_shost, iface->addr.data());
+            mac_cpy(ether_hdr->ether_dhost, arp_hdr->arp_sha);
 
             arp_hdr->arp_op = arp_op_reply;
             arp_hdr->arp_tip = arp_hdr->arp_sip;
-            copy_mac_addr(arp_hdr->arp_tha, arp_hdr->arp_sha);
+            mac_cpy(arp_hdr->arp_tha, arp_hdr->arp_sha);
             arp_hdr->arp_sip = iface->ip;
             copy_mac_addr(arp_hdr->arp_sha, iface->addr);
 
