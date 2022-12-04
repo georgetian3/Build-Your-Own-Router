@@ -78,7 +78,7 @@ struct icmp_t3_hdr {
 ////////////////////////////////////////////////////
 // ADDED
 
-struct ICMP {
+struct ICMP2 {
   uint8_t type;
   uint8_t code;
   uint16_t cksum;
@@ -86,10 +86,6 @@ struct ICMP {
   uint16_t seq;
   uint8_t data[sizeof(ip_hdr + 64)]; //  Internet Header + 64 bits of Original Data Datagram
 } __attribute__ ((packed));
-
-/* class ICMPFactory {
-private:
-    ICMPPacket pkt; */
 
 ///////////////////////////////////////////////////
 

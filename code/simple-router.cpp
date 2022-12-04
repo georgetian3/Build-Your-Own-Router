@@ -76,7 +76,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     if (ether_type == ethertype_arp) {
 
         arp_hdr* arp = (arp_hdr)ether_data.data();
-        print_hdr_arp(arp);
+        print_hdr_arp((uint8_t*)arp);
 
         if (arp->arp_op == arp_op_request) {
 
@@ -131,7 +131,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
         #pragma endregion 
         #pragma region // verify checksum
         ip_hdr* ip_h = (ip_hdr*)ether_data.data();
-        print_hdr_ip(ip_h);
+        print_hdr_ip((uint8_t*)ip_h);
 
         uint16_t checksum = cksum(ip_h, sizeof(ip_hdr));
         if (checksum != 0) {
@@ -177,12 +177,12 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
                 // Don't forward if TTL = 0
                 if (ip_h->ip_ttl == 0) {
                     printf("TTL = 0\n");
-                    ICMP icmp;
+                    ICMP2 icmp;
                     #define ICMP_TIME_EXCEEDED 11
                     icmp.icmp_type = ICMP_TIME_EXCEEDED;
                     icmp.icmp_code = 0;
                     memcpy(icmp.data, ip_h, sizeof(ip_hdr));
-                    memcpy(icmp.data + sizeof(ip_hdr), 
+                    memcpy(icmp.data + sizeof(ip_hdr), ip_data.data(), 64); 
                     return;
                 }
                 printf("Decrementing TTL\n");
