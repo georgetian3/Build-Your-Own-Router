@@ -67,7 +67,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
         return;
     }
 
-    const char* payload = nullptr;`
+    const char* payload = nullptr;
 
     /* Your router must appropriately dispatch Ethernet frames (their payload) carrying ARP and IPv4
     packets. */
@@ -95,7 +95,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
   fprintf(stderr, "\ttarget ip address: ");
   print_addr_ip_int(ntohl(hdr->arp_tip));
 } */
-        if () {
+        if (1) {
         }
     }
     // handling IP packets
