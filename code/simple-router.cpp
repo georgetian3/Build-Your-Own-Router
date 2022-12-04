@@ -41,7 +41,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
 
     // FILL THIS IN
-    
+
     const ethernet_hdr* ether_hdr = (const ethernet_hdr *)packet.data();
 
     // Your router should ignore Ethernet frames other than ARP and IPv4.
@@ -66,7 +66,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
     // handling ARP packets
     if (ether_type == ethertype_arp) {
-        const arp_hdr* hdr = reinterpret_cast<const arp_hdr*>(ether_payload);
+        const arp_hdr* arp_hdr = reinterpret_cast<const arp_hdr*>(ether_payload);
         print_hdr_arp(ether_payload);
 
         if (1) {
@@ -74,7 +74,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     }
     // handling IP packets
     if (ether_type == ethertype_ip) {
-        const ip_hdr* hdr = reinterpret_cast<const ip_hdr*>(ether_payload);
+        const ip_hdr* ip_hdr = reinterpret_cast<const ip_hdr*>(ether_payload);
         ;
     }
 
