@@ -95,12 +95,11 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
   fprintf(stderr, "\ttarget ip address: ");
   print_addr_ip_int(ntohl(hdr->arp_tip));
 } */
-        if 
-        ;
+        if () {
+        }
     }
     // handling IP packets
     if (ether_type == ethertype_ip) {
-
 
         ;
     }
