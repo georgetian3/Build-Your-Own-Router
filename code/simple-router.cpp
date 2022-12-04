@@ -112,7 +112,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
         }
     } else if (ether_type == ethertype_ip) {
-        const ip_hdr* ip_hdr = reinterpret_cast<const ip_hdr*>(ether_payload);
+        ip_hdr* ip_h = reinterpret_cast<ip_hdr*>(ether_payload);
 
     }
 
