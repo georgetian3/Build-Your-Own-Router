@@ -35,8 +35,8 @@ RoutingTable::lookup(uint32_t ip) const
   // FILL THIS IN
     std::string ip_str = ipToString(ip);
     int longest_prefix_length = 0;
-    std::list<RoutingTableEntry>::iterator longest_prefix_string = m_entries.end();
-    for (std::list<RoutingTableEntry>::iterator it = m_entries.begin(); it != m_entries.end(); ++it) {
+    std::list<RoutingTableEntry>::const_iterator longest_prefix_string = m_entries.end();
+    for (std::list<RoutingTableEntry>::const_iterator it = m_entries.begin(); it != m_entries.end(); ++it) {
         std::string prefix = ipToString(it->dest)
         if (prefix.length() <= longest_prefix_length) {
             continue;
