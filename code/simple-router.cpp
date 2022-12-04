@@ -161,14 +161,14 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
             /* For each forwarded IPv4 packet, your router should correctly decrement TTL and recompute the
             checksum. */
-            #pragma region // decrement TTL
+            #pragma region decrement TTL
                 // Don't forward if TTL = 0
-                if (ip_h->ip_ttl = 0) {
+                if (ip_h->ip_ttl == 0) {
                     return;
                 }
                 ip_h->ip_ttl -= 1;
             #pragma endregion
-            #pragma region // recompute checksum
+            #pragma region decrement TTL
                 // copy header excluding old checksum
                 #define HDR_LESS_CKSUM_LEN 18
                 uint8_t* hdr_less_cksum[HDR_LESS_CKSUM_LEN];
@@ -183,6 +183,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
                 ip_h->ip_sum = cksum(hdr_less_cksum, HDR_LESS_CKSUM_LEN);
             #pragma endregion
         
+
             mac_cpy(ether_hdr->ether_shost, iface->addr.data());
             mac_cpy(ether_hdr->ether_dhost, next_hop.dest);
 
