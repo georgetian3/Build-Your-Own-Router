@@ -68,7 +68,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     packets. */
 
 
-    uint8_t* ether_payload = reinterpret_cast<uint8_t*>(packet.data() + (uint8_t*)sizeof(ethernet_hdr));
+    uint8_t* ether_payload = reinterpret_cast<uint8_t*>(packet.data()) + reinterpret_cast<uint8_t*>(sizeof(ethernet_hdr));
 
     // Your router should ignore Ethernet frames other than ARP and IPv4.
     int ether_type = ntohs(ether_hdr->ether_type);
