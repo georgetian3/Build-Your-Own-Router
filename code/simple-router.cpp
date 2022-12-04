@@ -61,11 +61,11 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     ( FF:FF:FF:FF:FF:FF ). */
 
     // TODO: complete
-    const char* broadcast_address = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+/*     const char* broadcast_address = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     std::string ether_dhost = std::string(ehdr->ether_dhost);
     if (ether_dhost != broadcast_address && ether_dhost != iface->addr) {
         return;
-    }
+    } */
 
     const char* ether_payload = nullptr;
 
