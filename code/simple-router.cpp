@@ -68,7 +68,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     packets. */
 
 
-    uint8_t* ether_payload = reinterpret_cast<uint8_t*>(packet.data()) + reinterpret_cast<uint8_t*>(sizeof(ethernet_hdr));
+    uint8_t* ether_payload = const_cast<uint8_t*>(packet.data()) + reinterpret_cast<uint8_t*>(sizeof(ethernet_hdr));
 
     // Your router should ignore Ethernet frames other than ARP and IPv4.
     int ether_type = ntohs(ether_hdr->ether_type);
@@ -95,7 +95,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
             arp->arp_tip = arp->arp_sip;
             mac_cpy(arp->arp_tha, arp->arp_sha);
             arp->arp_sip = iface->ip;
-            mac_cpy(arp->arp_sha, iface->addr);
+            mac_cpy(arp->arp_sha, iface->addr.data());
 
 
             memcpy(ether_payload, arp, sizeof(arp_hdr));
@@ -108,7 +108,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
             (Source IP/Source hardware address in the ARP reply). Afterwards, the router should send out all
             corresponding enqueued packets. */
             // TODO: handle request
-            std::shared_ptr<ArpRequest> request = insertArpEntry(arp->arp_sha, arp->arp_sip);
+            //std::shared_ptr<ArpRequest> request = insertArpEntry(arp->arp_sha, arp->arp_sip);
 
         }
     } else if (ether_type == ethertype_ip) {
