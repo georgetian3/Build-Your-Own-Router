@@ -37,19 +37,74 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
     std::cerr << getRoutingTable() << std::endl;
 
+    print_hdr_eth(packet->data);
+
+    const ethernet_hdr *ehdr = (const ethernet_hdr *)packet->data;
+
+/*     fprintf(stderr, "ETHERNET header:\n");
+    fprintf(stderr, "\tdestination: ");
+    print_addr_eth(ehdr->ether_dhost);
+    fprintf(stderr, "\tsource: ");
+    print_addr_eth(ehdr->ether_shost);
+    fprintf(stderr, "\ttype: %d\n", ntohs(ehdr->ether_type));
+ */
     // FILL THIS IN
 
-    ethernet_hdr hdr = static_cast<ethernet_hdr>(packet.begin(), packet.begin() + sizeof(ethernet_hdr));
-
     // Your router should ignore Ethernet frames other than ARP and IPv4.
-    if (ethertype(packet) != ethertype_arp || ethertype(packet) != ethertype_ip) {
+    int ether_type = ntohs(ehdr->ether_type);
+    if (ether_type != ethertype_arp || ether_type != ethertype_ip) {
         return;
     }
 
     /* Your router must ignore Ethernet frames not destined to the router, i.e., when destination hard-
     ware address is neither the corresponding MAC address of the interface nor a broadcast address
     ( FF:FF:FF:FF:FF:FF ). */
-    int
+
+    // TODO: complete
+    const char* broadcast_address = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    std::string ether_dhost = std::string(ehdr->ether_dhost);
+    if (ether_dhost != broadcast_address && ether_dhost != iface->addr) {
+        return;
+    }
+
+    const char* payload = 
+
+    /* Your router must appropriately dispatch Ethernet frames (their payload) carrying ARP and IPv4
+    packets. */
+
+    // handling ARP packets
+    if (ether_type == ethertype_arp) {
+        print_hdr_arp(const uint8_t* buf)
+        const arp_hdr *hdr = reinterpret_cast<const arp_hdr*>(buf);
+
+/*         void print_hdr_arp(const uint8_t* buf) {
+  fprintf(stderr, "ARP header\n");
+  fprintf(stderr, "\thardware type: %d\n", ntohs(hdr->arp_hrd));
+  fprintf(stderr, "\tprotocol type: %d\n", ntohs(hdr->arp_pro));
+  fprintf(stderr, "\thardware address length: %d\n", hdr->arp_hln);
+  fprintf(stderr, "\tprotocol address length: %d\n", hdr->arp_pln);
+  fprintf(stderr, "\topcode: %d\n", ntohs(hdr->arp_op));
+
+  fprintf(stderr, "\tsender hardware address: ");
+  print_addr_eth(hdr->arp_sha);
+  fprintf(stderr, "\tsender ip address: ");
+  print_addr_ip_int(ntohl(hdr->arp_sip));
+
+  fprintf(stderr, "\ttarget hardware address: ");
+  print_addr_eth(hdr->arp_tha);
+  fprintf(stderr, "\ttarget ip address: ");
+  print_addr_ip_int(ntohl(hdr->arp_tip));
+} */
+        if 
+        ;
+    }
+    // handling IP packets
+    if (ether_type == ethertype_ip) {
+
+
+        ;
+    }
+
 
 
 }
