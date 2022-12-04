@@ -208,7 +208,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
             if (arp_entry == nullptr) {
                 ;
             } else {
-                mac_cpy(ether_hdr->ether_dhost, arp_entry->mac);
+                mac_cpy(ether_hdr->ether_dhost, arp_entry->mac.data());
             }
             mac_cpy(ether_hdr->ether_shost, iface->addr.data());
 
