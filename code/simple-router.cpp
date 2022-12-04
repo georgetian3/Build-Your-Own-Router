@@ -37,9 +37,9 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
     std::cerr << getRoutingTable() << std::endl;
 
-    print_hdr_eth(packet.data);
+    print_hdr_eth(packet.data());
 
-    const ethernet_hdr *ehdr = (const ethernet_hdr *)packet.data;
+    const ethernet_hdr *ehdr = (const ethernet_hdr *)packet.data();
 
 /*     fprintf(stderr, "ETHERNET header:\n");
     fprintf(stderr, "\tdestination: ");
