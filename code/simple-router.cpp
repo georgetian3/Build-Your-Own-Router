@@ -59,7 +59,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     /* Your router must ignore Ethernet frames not destined to the router, i.e., when destination hard-
     ware address is neither the corresponding MAC address of the interface nor a broadcast address
     ( FF:FF:FF:FF:FF:FF ). */
-    const uint8_t* broadcast_address = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    const uint8_t broadcast_address[ETHER_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     if (memcmp(hdr->ether_dhost, broadcast_address , ETHER_ADDR_LEN) &&
         memcmp(hdr->ether_dhost, iface->addr.data(), ETHER_ADDR_LEN)) {
         return;
