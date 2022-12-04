@@ -39,19 +39,13 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
     print_hdr_eth(packet.data());
 
-    const ethernet_hdr *ehdr = (const ethernet_hdr *)packet.data();
 
-/*     fprintf(stderr, "ETHERNET header:\n");
-    fprintf(stderr, "\tdestination: ");
-    print_addr_eth(ehdr->ether_dhost);
-    fprintf(stderr, "\tsource: ");
-    print_addr_eth(ehdr->ether_shost);
-    fprintf(stderr, "\ttype: %d\n", ntohs(ehdr->ether_type));
- */
     // FILL THIS IN
+    
+    const ethernet_hdr* ether_hdr = (const ethernet_hdr *)packet.data();
 
     // Your router should ignore Ethernet frames other than ARP and IPv4.
-    int ether_type = ntohs(ehdr->ether_type);
+    int ether_type = ntohs(ether_hdr->ether_type);
     if (ether_type != ethertype_arp || ether_type != ethertype_ip) {
         return;
     }
@@ -60,8 +54,8 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
     ware address is neither the corresponding MAC address of the interface nor a broadcast address
     ( FF:FF:FF:FF:FF:FF ). */
     const uint8_t broadcast_address[ETHER_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-    if (memcmp(hdr->ether_dhost, broadcast_address , ETHER_ADDR_LEN) &&
-        memcmp(hdr->ether_dhost, iface->addr.data(), ETHER_ADDR_LEN)) {
+    if (memcmp(ether_hdr->ether_dhost, broadcast_address , ETHER_ADDR_LEN) &&
+        memcmp(ether_hdr->ether_dhost, iface->addr.data(), ETHER_ADDR_LEN)) {
         return;
     }
 
