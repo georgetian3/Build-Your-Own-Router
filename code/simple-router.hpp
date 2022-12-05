@@ -24,10 +24,15 @@
 
 #include "pox.hpp"
 
+#include "test.hpp" // ADDED
+
 namespace simple_router {
 
 class SimpleRouter
 {
+
+    friend class Test; //ADDED
+
 public:
 
   SimpleRouter();

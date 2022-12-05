@@ -140,7 +140,7 @@ private:
 
 } // namespace simple_router
 
-int main(int argc, char** argv)
+/* int main(int argc, char** argv)
 {
 #ifdef ICE_STATIC_LIBS
   Ice::registerIceSSL();
@@ -148,4 +148,16 @@ int main(int argc, char** argv)
 
   simple_router::Router router;
   return router.main(argc, argv, "router.config");
+}
+ */
+
+// ADDED
+
+using namespace simple_router;
+
+int main() {
+    SimpleRouter r;
+    Test t(&r);
+    Buffer buf = {1, 2, 3};
+    r.handlePacket(buf, "sw0-eth3");
 }

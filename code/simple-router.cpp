@@ -38,6 +38,7 @@ namespace simple_router {
 void
 SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 {
+    printIfaces(std::cout);
     std::cerr << "Got packet of size " << packet.size() << " on interface " << inIface << std::endl;
 
     const Interface* iface = findIfaceByName(inIface);
