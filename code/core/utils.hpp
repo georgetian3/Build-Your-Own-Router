@@ -32,6 +32,9 @@
 
 #include "protocol.hpp"
 
+#include <iostream> // ADDED
+
+
 namespace simple_router {
 
 uint16_t cksum(const void* data, int len);
@@ -59,6 +62,29 @@ void print_hdr_arp(const uint8_t* buf);
 void print_hdrs(const uint8_t* buf, uint32_t length);
 
 void print_hdrs(const Buffer& buffer);
+
+
+// ADDED
+
+enum icmp_type {
+    echo_reply,
+    time_exceeded,
+    port_unreachable,
+};
+
+ethernet_hdr*   get_ether_h(const Buffer& packet);
+arp_hdr*        get_arp_h(const Buffer& packet);
+ip_hdr*         get_ip_h(const Buffer& packet);
+icmp_hdr*       get_icmp_h(const Buffer& packet);
+
+void set_ether_h(ethernet_hdr* ether_h, const enum ethertype type, const uint8_t* shost, const uint8_t* dhost);
+void set_arp_h(arp_hdr* arp_h, const arp_opcode opcode, const uint32_t sip, const uint32_t tip, const uint8_t* sha, const uint8_t* tha);
+void set_ip_h(ip_hdr* ip_h, const uint16_t len, const uint8_t ttl, const uint8_t protocol, const uint32_t ip_src, const uint32_t ip_dst);
+void set_icmp_h(icmp_hdr* icmp_h, icmp_type type);
+void print_section(const ::std::string& section, char c = '#');
+void print_addr_eth(const uint8_t* addr);
+
+
 
 } // namespace simple_router
 

@@ -31,7 +31,49 @@ void
 ArpCache::periodicCheckArpRequestsAndCacheEntries()
 {
 
-  // FILL THIS IN
+    // FILL THIS IN
+    print_section("BEGIN CheckArp");
+    std::cout << "HARDCODED\n";
+    const std::string iface = "sw0-eth";
+    Buffer packet;
+    for (auto it = m_arpRequests.begin(); it != m_arpRequests.end(); ++it) {
+        if (steady_clock::now() - (*it)->timeSent > seconds(1)) {
+            if ((*it)->nTimesSent >= 5) {
+                return;
+                /*send icmp host unreachable to source addr of all pkts waiting
+                 on this request*/
+                set_icmp_h(get_icmp_h(packet), port_unreachable);
+                /* When an ICMP message is composed by a router, the source address field of the internet header can be
+                the IP address of any of the router’s interfaces, as specified in RFC 792. */
+                
+                //m_router.findIfaceByIp
+                //set_ip_h(get_ip_h(packet), );
+                //set_ether_h(get_ether_h(packet), ethertype_ip);
+                std::cout << "Send host unreachable\n";
+                m_router.sendPacket(packet, iface);
+                removeRequest(*it);
+            } else {
+                (*it)->timeSent = steady_clock::now();
+                (*it)->nTimesSent++;
+                std::cout << "Resending ARP request\n";
+                for (auto it2 = (*it)->packets.begin(); it2 != (*it)->packets.end(); it2++) {
+
+                    m_router.sendPacket(it2->packet, it2->iface);
+                }
+            }
+        }
+    }
+
+    // remove invalid cache entries
+    for (auto it = m_cacheEntries.begin(); it != m_cacheEntries.end();) {
+        if (!(*it)->isValid) {
+            it = m_cacheEntries.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    print_section("END CheckArp");
 
 }
 //////////////////////////////////////////////////////////////////////////

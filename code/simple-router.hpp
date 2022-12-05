@@ -24,8 +24,6 @@
 
 #include "pox.hpp"
 
-#include "test.hpp" // ADDED
-
 namespace simple_router {
 
 class SimpleRouter

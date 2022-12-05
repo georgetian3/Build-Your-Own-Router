@@ -1,1 +1,1 @@
-sudo ./run.py
+sudo mn -c && sudo ./run.py
