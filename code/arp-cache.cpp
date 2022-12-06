@@ -41,20 +41,20 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
             continue;
         }
         if (arp_request->nTimesSent >= MAX_SENT_TIME) {
-            for (auto q_packet = arp_request->packets.begin(); q_packet != arp_request->packets.end(); ++q_packet) {
+
+            for (const auto& q_packet: arp_request->packets) {
 
                 Buffer packet_out(sizeof(ethernet_hdr) + sizeof(ip_hdr) + sizeof(icmp_hdr));
-                set_icmp_h(get_icmp_h(packet_out), port_unreachable);
+                set_icmp_h(get_icmp_h(packet_out), port_unreachable, packet_out.size());
 
                 
-                outIface = m_router.findIfaceByName(q_packet->iface);
+                outIface = m_router.findIfaceByName(q_packet.iface);
 
                 auto ip_h = get_ip_h(packet_out);
                 set_ip_h(ip_h, sizeof(ip_hdr) + sizeof(icmp_hdr), 64, ip_protocol_icmp, 
                     outIface->ip, outIface->ip //get_ip_h(q_packet->packet)->ip_dst
                 );
-                return;
-                set_ether_h(get_ether_h(packet_out), ethertype_ip, outIface->addr.data(), get_ether_h(q_packet->packet)->ether_shost);
+                set_ether_h(get_ether_h(packet_out), ethertype_ip, outIface->addr.data(), get_ether_h(q_packet.packet)->ether_shost);
                 std::cout << "Send host unreachable\n";
                 m_router.sendPacket(packet_out, outIface->name);
             }

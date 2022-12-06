@@ -140,31 +140,41 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
                 std::cerr << "Received non-ICMP, ignore" << std::endl;
                 return;
             }
-            std::cerr << "Received ICMP" << std::endl;
-
+            
             auto icmp_h = get_icmp_h(packet);
+
+            uint16_t old_sum = icmp_h->icmp_sum;
+            icmp_h->icmp_sum = 0;
+            size_t icmp_len = packet.size() - sizeof(ethernet_hdr) - sizeof(ip_hdr);
+            if (cksum(icmp_h, icmp_len) != old_sum) {
+                std::cerr << "ICMP checksum incorrect, ignore" << std::endl;
+                return;
+            }
 
             if (icmp_h->icmp_type != 8) { // if not echo request
                 std::cerr << "ICMP type unknown" << std::endl;
                 return;
             }
 
-            set_icmp_h(get_icmp_h(packet), echo_reply);
-            set_ip_h(get_ip_h(packet), sizeof(ip_hdr) + sizeof(icmp_hdr), 64, ip_protocol_icmp, iface->ip, ip_h->ip_src);
+            std::cerr << "Received ICMP echo request of length " << icmp_len << std::endl;
+
+            set_icmp_h(get_icmp_h(packet), echo_reply, icmp_len);
+            set_ip_h(get_ip_h(packet), sizeof(ip_hdr) + icmp_len, 64, ip_protocol_icmp, iface->ip, ip_h->ip_src);
 
             auto arp_entry = m_arp.lookup(ip_h->ip_dst);
             if (arp_entry == nullptr) {
-                std::cerr << "Destination MAC unknown" << std::endl;
+                std::cerr << "Echo reply MAC unknown" << std::endl;
+                m_arp.queueRequest(ip_h->ip_dst, packet, inIface);
                 Buffer arp_request(sizeof(ethernet_hdr) + sizeof(arp_hdr));
-                set_arp_h(get_arp_h(arp_request), arp_op_request, iface->ip, ip_h->ip_dst, iface->addr.data(), nullptr);
+                set_arp_h(get_arp_h(arp_request), arp_op_request, ip_h->ip_src, ip_h->ip_dst, iface->addr.data(), nullptr);
                 set_ether_h(get_ether_h(arp_request), ethertype_arp, iface->addr.data(), nullptr);
-                std::cerr << "Sending ARP request" << std::endl;
+                std::cerr << "Send ARP request" << std::endl;
                 sendPacket(arp_request, inIface);
                 return;
             }
             
             set_ether_h(get_ether_h(packet), ethertype_ip, iface->addr.data(), arp_entry->mac.data());
-            std::cerr << "Sending ICMP reply" << std::endl;
+            std::cerr << "Sending ICMP echo reply" << std::endl;
             sendPacket(packet, inIface);
             return;
         }
@@ -221,9 +231,9 @@ void
 SimpleRouter::sendPacket(const Buffer& packet, const std::string& outIface)
 {
     
-    //print_section("BEGIN sendPacket");
-    //print_hdrs(packet);
-    //print_section("END sendPacket");
+/*     print_section("BEGIN sendPacket");
+    print_hdrs(packet);
+    print_section("END sendPacket"); */
 
 
     

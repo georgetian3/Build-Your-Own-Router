@@ -176,8 +176,16 @@ void print_hdr_icmp(const uint8_t* buf) {
   fprintf(stderr, "ICMP header:\n");
   fprintf(stderr, "\ttype: %d\n", hdr->icmp_type);
   fprintf(stderr, "\tcode: %d\n", hdr->icmp_code);
-  /* Keep checksum in NBO */
   fprintf(stderr, "\tchecksum: %d\n", hdr->icmp_sum);
+
+  // ADDED
+  /* const icmp_hdr2 *hdr = reinterpret_cast<const icmp_hdr2*>(buf);
+  fprintf(stderr, "ICMP header:\n");
+  fprintf(stderr, "\ttype: %d\n", hdr->type);
+  fprintf(stderr, "\tcode: %d\n", hdr->code);
+  fprintf(stderr, "\tchecksum: %d\n", hdr->cksum);
+  fprintf(stderr, "\tid: %d\n", hdr->id);
+  fprintf(stderr, "\tseq num: %d\n", hdr->seq); */
 }
 
 
@@ -305,7 +313,7 @@ void set_arp_h(arp_hdr* arp_h, const arp_opcode opcode, const uint32_t sip, cons
 }
 
 void set_ip_h(ip_hdr* ip_h, const uint16_t len, const uint8_t ttl, const uint8_t protocol, const uint32_t ip_src, const uint32_t ip_dst) {
-    ip_h->ip_len = len;
+    ip_h->ip_len = ntohs(len);
     ip_h->ip_ttl = ttl;
     ip_h->ip_p   = protocol;
     ip_h->ip_src = ip_src;
@@ -314,7 +322,7 @@ void set_ip_h(ip_hdr* ip_h, const uint16_t len, const uint8_t ttl, const uint8_t
     ip_h->ip_sum = cksum(ip_h, sizeof(ip_hdr));
 }
 
-void set_icmp_h(icmp_hdr* icmp_h, icmp_msg type) {
+void set_icmp_h(icmp_hdr* icmp_h, icmp_msg type, size_t len) {
     if (type == echo_reply) {
         icmp_h->icmp_type = 0;
     } else if (type == time_exceeded) {
@@ -325,7 +333,7 @@ void set_icmp_h(icmp_hdr* icmp_h, icmp_msg type) {
         icmp_h->icmp_code = 3;
     }
     icmp_h->icmp_sum = 0;
-    icmp_h->icmp_sum = cksum(icmp_h, sizeof(icmp_h));
+    icmp_h->icmp_sum = cksum(icmp_h, len);
 }
 
 void print_section(const ::std::string& section, char c) {

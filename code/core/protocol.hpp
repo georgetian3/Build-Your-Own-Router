@@ -108,13 +108,12 @@ struct ip_hdr
 ////////////////////////////////////////////////////
 // ADDED
 
-struct ICMP2 {
+struct icmp_hdr2 {
   uint8_t type;
   uint8_t code;
   uint16_t cksum;
   uint16_t id;
   uint16_t seq;
-  uint8_t data[sizeof(ip_hdr) + 64]; //  Internet Header + 64 bits of Original Data Datagram
 } __attribute__ ((packed));
 
 ///////////////////////////////////////////////////
