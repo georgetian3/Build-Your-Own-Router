@@ -37,9 +37,7 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
     const Interface* outIface;
     for (auto arp_request_it = m_arpRequests.begin(); arp_request_it != m_arpRequests.end(); ++arp_request_it) {
         auto arp_request = *arp_request_it;
-        if (steady_clock::now() - arp_request->timeSent <= seconds(1)) {
-            continue;
-        }
+
         if (arp_request->nTimesSent >= MAX_SENT_TIME) {
 
             for (const auto& q_packet: arp_request->packets) {
@@ -64,14 +62,13 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
             arp_request->timeSent = steady_clock::now();
             arp_request->nTimesSent++;
             std::cout << "Resending ARP request\n";
-            return;
             outIface = m_router.findIfaceByName(arp_request->packets.front().iface);
             set_arp_h(get_arp_h(packet_out), arp_op_request, outIface->ip, arp_request->ip, outIface->addr.data(), nullptr);
             set_ether_h(get_ether_h(packet_out), ethertype_arp, outIface->addr.data(), nullptr);
 
             m_router.sendPacket(packet_out, outIface->name);
         }
-}
+    }
 
     // remove invalid cache entries
     for (auto it = m_cacheEntries.begin(); it != m_cacheEntries.end();) {

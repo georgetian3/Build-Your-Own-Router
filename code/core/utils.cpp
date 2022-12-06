@@ -348,6 +348,17 @@ void print_section(const ::std::string& section, char c) {
     std::cout << ' ' << section << ' ' << half << '\n';
 }
 
-    
+
+Buffer make_buffer(const uint8_t* data, size_t len) {
+    Buffer buffer(len);
+    memcpy(buffer.data(), data, len);
+    return buffer;
+}
+
+Buffer concat_buf(const Buffer& a, const Buffer& b) {
+    Buffer buf = a;
+    buf.insert(buf.end(), b.begin(), b.end());
+    return buf;
+}
 
 } // namespace simple_router

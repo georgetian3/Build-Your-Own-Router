@@ -79,7 +79,7 @@ using steady_clock = std::chrono::steady_clock;
 using time_point = std::chrono::steady_clock::time_point;
 using seconds = std::chrono::seconds;
 
-const seconds SR_ARPCACHE_TO = seconds(30);
+const seconds SR_ARPCACHE_TO = seconds(10); // ADDED
 const uint32_t MAX_SENT_TIME = 5;
 
 struct PendingPacket

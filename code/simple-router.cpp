@@ -39,7 +39,7 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
     print_section("handlePacket");
     //printIfaces(std::cerr);
     std::cerr << "Got packet of size " << packet.size() << " on interface " << inIface << " at " << steady_clock::now().time_since_epoch().count() / 1000000000.0 << std::endl;
-    //print_hdrs(packet);
+    print_hdrs(packet);
 
     const Interface* iface = findIfaceByName(inIface);
     if (iface == nullptr) {
@@ -52,7 +52,7 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
     if (packet.size() < sizeof(ethernet_hdr)) {
         std::cerr << "Ethernet header too short, ignore" << std::endl;
         return;
-    }        
+    }       
 
     if (macToString(packet) != "ff:ff:ff:ff:ff:ff" &&
         macToString(packet) != macToString(iface->addr)) {
@@ -94,7 +94,7 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
                 for (const auto& pending: arp_requests->packets) {
                     std::cerr << "Forwarding queued packets" << std::endl;
                     auto ip_h = get_ip_h(pending.packet);
-                    set_ip_h(ip_h, ip_h->ip_len, ip_h->ip_ttl - 1, ip_h->ip_p, ip_h->ip_src, ip_h->ip_dst);
+                    set_ip_h(ip_h, ntohs(ip_h->ip_len), ip_h->ip_ttl - 1, ip_h->ip_p, ip_h->ip_src, ip_h->ip_dst);
                     set_ether_h(get_ether_h(pending.packet), ethertype_ip, findIfaceByName(pending.iface)->addr.data(), arp_sha.data());
                     sendPacket(pending.packet, pending.iface);
                 }
@@ -187,7 +187,7 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
             return; 
         }
 
-        set_ip_h(ip_h, ip_h->ip_len, ip_h->ip_ttl - 1, ip_h->ip_p, ip_h->ip_src, ip_h->ip_dst);
+        set_ip_h(ip_h, ntohs(ip_h->ip_len), ip_h->ip_ttl - 1, ip_h->ip_p, ip_h->ip_src, ip_h->ip_dst);
 
         std::cerr << "Forwarding IPv4 packet" << std::endl;
         RoutingTableEntry next_hop;
@@ -231,9 +231,9 @@ void
 SimpleRouter::sendPacket(const Buffer& packet, const std::string& outIface)
 {
     
-/*     print_section("BEGIN sendPacket");
+    print_section("BEGIN sendPacket");
     print_hdrs(packet);
-    print_section("END sendPacket"); */
+    print_section("END sendPacket");
 
 
     

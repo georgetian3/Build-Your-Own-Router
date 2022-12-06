@@ -85,6 +85,211 @@ void print_section(const ::std::string& section, char c = '#');
 void print_addr_eth(const uint8_t* addr);
 
 
+Buffer make_buffer(const uint8_t* data, size_t len);
+Buffer concat_buf(const Buffer& a, const Buffer& b);
+
+class Ethernet {
+
+private:
+
+    ethernet_hdr m_h;
+    Buffer m_data;
+
+public:
+
+    Ethernet() {}
+    Ethernet(const Buffer& packet) {
+        memcpy(&m_h, packet.data(), sizeof(ethernet_hdr));
+        m_data = Buffer(packet.begin() + sizeof(ethernet_hdr), packet.end());
+    }
+    uint16_t get_type() const {
+        return ntohs(m_h.ether_type);
+    }
+    void set_type(uint16_t type) {
+        m_h.ether_type = ntohs(type);
+    }
+    Buffer get_src() const {
+        Buffer buf(ETHER_ADDR_LEN);
+        memcpy(buf.data(), m_h.ether_shost, ETHER_ADDR_LEN);
+        return buf;
+    }
+    void set_src(const uint8_t* src) {
+        if (src) {
+            memcpy(m_h.ether_shost, src, ETHER_ADDR_LEN);
+        }
+    }
+    Buffer get_dst() const {
+        Buffer buf(ETHER_ADDR_LEN);
+        memcpy(buf.data(), m_h.ether_shost, ETHER_ADDR_LEN);
+        return buf;
+    }
+    void set_dst(const uint8_t* dst) {
+        // set dst to 0 for broadcast
+        if (dst) {
+            memcpy(m_h.ether_dhost, dst, ETHER_ADDR_LEN);
+        } else {
+            memset(m_h.ether_dhost, 0xff, ETHER_ADDR_LEN);
+        }
+    }
+    Buffer get_data() const {
+        return m_data;
+    }
+    void set_data(Buffer data) {
+        m_data = data;
+    }
+    Ethernet(uint16_t type, const uint8_t* src, uint8_t* dst, Buffer data) {
+        set_type(type);
+        set_src(src);
+        set_dst(dst);
+        set_data(data);
+    }
+    Buffer get_packet() {
+        Buffer hdr(sizeof(ethernet_hdr));
+        memcpy(hdr.data(), &m_h, sizeof(ethernet_hdr));
+        return concat_buf(hdr, m_data);
+    }
+};
+
+
+
+
+
+
+
+class ARP {
+
+private:
+
+    arp_hdr m_h;
+
+    void set_defaults() {
+        m_h.arp_hrd = htons(arp_hrd_ethernet);
+        m_h.arp_pro = htons(ethertype_ip);
+        m_h.arp_hln = ETHER_ADDR_LEN;
+        m_h.arp_pln = sizeof(uint32_t);
+    }
+
+public:
+
+    ARP() {
+        set_defaults();
+    }
+    ARP(const Buffer& packet) {
+        memcpy(&m_h, packet.data() + sizeof(ethernet_hdr), sizeof(arp_hdr));
+    }
+    unsigned short get_opcode() const {
+        return m_h.arp_op;
+    }
+
+    Buffer get_src_mac() const {
+        return make_buffer(m_h.arp_sha, ETHER_ADDR_LEN);
+    }
+
+    uint32_t get_src_ip() const {
+        return m_h.arp_sip;
+    }
+
+    uint32_t get_dst_ip() const {
+        return m_h.arp_tip;
+    }
+
+    Buffer make_request(uint32_t src_ip, uint32_t dst_ip, const uint8_t* src_mac) {
+        m_h.arp_op = htons(arp_op_request);
+
+        m_h.arp_sip = src_ip;
+        m_h.arp_tip = dst_ip;
+
+        memcpy(m_h.arp_sha, src_mac, ETHER_ADDR_LEN);
+        memset(m_h.arp_tha, 0xff, ETHER_ADDR_LEN);
+
+        return Ethernet((uint16_t)ethertype_arp, src_mac, 0,
+            make_buffer((const uint8_t*)&m_h, sizeof(arp_hdr))
+        ).get_packet();
+    }
+
+    Buffer make_reply(const Buffer& request, const uint8_t* src_mac) {
+        m_h.arp_op = htons(arp_op_reply);
+        auto arp_h = (arp_hdr*)(request.data() + sizeof(ethernet_hdr));
+
+        // old src mac is new dst mac
+        memcpy(m_h.arp_tha, arp_h->arp_sha, ETHER_ADDR_LEN);
+        memcpy(m_h.arp_sha, src_mac, ETHER_ADDR_LEN);
+
+        // src and dst ips are swapped
+        m_h.arp_sip = arp_h->arp_tip;
+        m_h.arp_tip = arp_h->arp_sip;
+
+        return Ethernet(ethertype_arp, src_mac, arp_h->arp_sha,
+            make_buffer((const uint8_t*)&m_h, sizeof(arp_hdr))
+        ).get_packet();
+    }
+
+
+};
+    
+
+class IP {
+
+private:
+
+    ip_hdr m_h;
+    Buffer data;
+
+public:
+
+    IP() {}
+
+    IP(const Buffer& packet) {
+        memcpy(&m_h, packet.data() + sizeof(ethernet_hdr), sizeof(ip_hdr));
+        data = Buffer(packet.begin() + sizeof(ethernet_hdr), packet.end());
+    }
+
+    void decrement_ttl() {
+        m_h.ip_ttl--;
+    }
+
+    bool ttl_valid() const {
+        return m_h.ip_ttl > 0;
+    }
+
+    static Buffer make_forwarded(const Buffer& packet, const uint8_t* src_mac, const uint8_t* dst_mac) {
+        IP forwarded_ip(packet);
+        forwarded_ip.decrement_ttl();
+        Ethernet forwarded_ether(forwarded_ip.get_packet());
+        forwarded_ether.set_src(src_mac);
+        forwarded_ether.set_dst(dst_mac);
+        return forwarded_ether.get_packet();
+    }
+
+    Buffer get_packet() {
+        return concat_buf(make_buffer((const uint8_t*)&m_h, sizeof(ip_hdr)), data);
+    };
+
+};
+
+
+class ICMP {
+
+private:
+
+    icmp_hdr m_h;
+    Buffer data;
+
+public:
+
+    ICMP() {}
+    ICMP(const Buffer& packet) {
+        memcpy(&m_h, packet.data() + sizeof(ethernet_hdr) + sizeof(ip_hdr), sizeof(icmp_hdr));
+        data = Buffer(packet.begin() + sizeof(ethernet_hdr) + sizeof(ip_hdr) + sizeof(icmp_hdr), packet.end());
+    }
+
+    Buffer echo_reply(const Buffer& packet) {
+        Buffer reply = packet;
+        
+    }
+
+};
+
 
 } // namespace simple_router
 
