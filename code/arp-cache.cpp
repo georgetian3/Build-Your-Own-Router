@@ -32,48 +32,57 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
 {
 
     // FILL THIS IN
-    print_section("BEGIN CheckArp");
-    std::cout << "HARDCODED\n";
-    const std::string iface = "sw0-eth";
-    Buffer packet;
-    for (auto it = m_arpRequests.begin(); it != m_arpRequests.end(); ++it) {
-        if (steady_clock::now() - (*it)->timeSent > seconds(1)) {
-            if ((*it)->nTimesSent >= 5) {
-                return;
-                /*send icmp host unreachable to source addr of all pkts waiting
-                 on this request*/
-                set_icmp_h(get_icmp_h(packet), port_unreachable);
-                /* When an ICMP message is composed by a router, the source address field of the internet header can be
-                the IP address of any of the router’s interfaces, as specified in RFC 792. */
-                
-                //m_router.findIfaceByIp
-                //set_ip_h(get_ip_h(packet), );
-                //set_ether_h(get_ether_h(packet), ethertype_ip);
-                std::cout << "Send host unreachable\n";
-                m_router.sendPacket(packet, iface);
-                removeRequest(*it);
-            } else {
-                (*it)->timeSent = steady_clock::now();
-                (*it)->nTimesSent++;
-                std::cout << "Resending ARP request\n";
-                for (auto it2 = (*it)->packets.begin(); it2 != (*it)->packets.end(); it2++) {
-
-                    m_router.sendPacket(it2->packet, it2->iface);
-                }
-            }
+    //print_section("BEGIN CheckArp");
+    
+    const Interface* outIface;
+    for (auto arp_request_it = m_arpRequests.begin(); arp_request_it != m_arpRequests.end(); ++arp_request_it) {
+        auto arp_request = *arp_request_it;
+        if (steady_clock::now() - arp_request->timeSent <= seconds(1)) {
+            continue;
         }
-    }
+        if (arp_request->nTimesSent >= MAX_SENT_TIME) {
+            for (auto q_packet = arp_request->packets.begin(); q_packet != arp_request->packets.end(); ++q_packet) {
+
+                Buffer packet_out(sizeof(ethernet_hdr) + sizeof(ip_hdr) + sizeof(icmp_hdr));
+                set_icmp_h(get_icmp_h(packet_out), port_unreachable);
+
+                
+                outIface = m_router.findIfaceByName(q_packet->iface);
+
+                auto ip_h = get_ip_h(packet_out);
+                set_ip_h(ip_h, sizeof(ip_hdr) + sizeof(icmp_hdr), 64, ip_protocol_icmp, 
+                    outIface->ip, outIface->ip //get_ip_h(q_packet->packet)->ip_dst
+                );
+                return;
+                set_ether_h(get_ether_h(packet_out), ethertype_ip, outIface->addr.data(), get_ether_h(q_packet->packet)->ether_shost);
+                std::cout << "Send host unreachable\n";
+                m_router.sendPacket(packet_out, outIface->name);
+            }
+            removeRequest(arp_request);
+        } else {
+            Buffer packet_out(sizeof(ethernet_hdr) + sizeof(arp_hdr));
+            arp_request->timeSent = steady_clock::now();
+            arp_request->nTimesSent++;
+            std::cout << "Resending ARP request\n";
+            return;
+            outIface = m_router.findIfaceByName(arp_request->packets.front().iface);
+            set_arp_h(get_arp_h(packet_out), arp_op_request, outIface->ip, arp_request->ip, outIface->addr.data(), nullptr);
+            set_ether_h(get_ether_h(packet_out), ethertype_arp, outIface->addr.data(), nullptr);
+
+            m_router.sendPacket(packet_out, outIface->name);
+        }
+}
 
     // remove invalid cache entries
     for (auto it = m_cacheEntries.begin(); it != m_cacheEntries.end();) {
-        if (!(*it)->isValid) {
-            it = m_cacheEntries.erase(it);
-        } else {
+        if ((*it)->isValid) {
             ++it;
+        } else {
+            it = m_cacheEntries.erase(it);
         }
     }
 
-    print_section("END CheckArp");
+    //print_section("END CheckArp");
 
 }
 //////////////////////////////////////////////////////////////////////////

@@ -275,7 +275,7 @@ void set_ether_h(ethernet_hdr* ether_h, enum ethertype type, const uint8_t* shos
     }
     memmove(ether_h->ether_shost, shost, ETHER_ADDR_LEN);
     if (dhost == nullptr) {
-        memset(ether_h->ether_dhost, 0, ETHER_ADDR_LEN);
+        memset(ether_h->ether_dhost, 0xff, ETHER_ADDR_LEN);
     } else {
         memmove(ether_h->ether_dhost, dhost, ETHER_ADDR_LEN);
     }
@@ -287,7 +287,7 @@ void set_arp_h(arp_hdr* arp_h, const arp_opcode opcode, const uint32_t sip, cons
     arp_h->arp_pro = ntohs(ethertype_ip);
     arp_h->arp_hln = ETHER_ADDR_LEN;
     arp_h->arp_pln = sizeof(uint32_t);
-    arp_h->arp_op = ntohs(opcode);
+    arp_h->arp_op  = ntohs(opcode);
     arp_h->arp_sip = sip;
     arp_h->arp_tip = tip;
     
@@ -298,7 +298,7 @@ void set_arp_h(arp_hdr* arp_h, const arp_opcode opcode, const uint32_t sip, cons
     }
     memmove(arp_h->arp_sha, sha, ETHER_ADDR_LEN);
     if (tha == nullptr) {
-        memset(arp_h->arp_tha, 0, ETHER_ADDR_LEN);
+        memset(arp_h->arp_tha, 0xff, ETHER_ADDR_LEN);
     } else {
         memmove(arp_h->arp_tha, tha, ETHER_ADDR_LEN);
     }
@@ -308,13 +308,13 @@ void set_ip_h(ip_hdr* ip_h, const uint16_t len, const uint8_t ttl, const uint8_t
     ip_h->ip_len = len;
     ip_h->ip_ttl = ttl;
     ip_h->ip_p   = protocol;
-    ip_h->ip_sum = 0;
     ip_h->ip_src = ip_src;
     ip_h->ip_dst = ip_dst;
+    ip_h->ip_sum = 0;
     ip_h->ip_sum = cksum(ip_h, sizeof(ip_hdr));
 }
 
-void set_icmp_h(icmp_hdr* icmp_h, icmp_type type) {
+void set_icmp_h(icmp_hdr* icmp_h, icmp_msg type) {
     if (type == echo_reply) {
         icmp_h->icmp_type = 0;
     } else if (type == time_exceeded) {

@@ -33,25 +33,20 @@ RoutingTable::lookup(uint32_t ip) const
 {
 
   // FILL THIS IN
-    std::string ip_str = ipToString(ip);
-    int longest_prefix_length = 0;
-    std::list<RoutingTableEntry>::const_iterator longest_prefix_string = m_entries.end();
-    for (std::list<RoutingTableEntry>::const_iterator it = m_entries.begin(); it != m_entries.end(); ++it) {
-        std::string prefix = ipToString(it->dest);
-        if (prefix.length() <= longest_prefix_length) {
-            continue;
+
+    std::list<RoutingTableEntry> entries_sorted(m_entries);
+    // sort entries in decreasing order
+    entries_sorted.sort(
+        [] (RoutingTableEntry& a, RoutingTableEntry& b) {
+            return a.mask > b.mask;
         }
-        if (ip_str.find(prefix)) {
-            longest_prefix_string = it;
-            longest_prefix_length = (prefix).length();;
+    );
+    for (const auto& current: entries_sorted) {
+        if (((current.mask) & (current.dest)) == ((current.mask) & ip)) {
+            return current;
         }
     }
-
-    if (longest_prefix_string == m_entries.end()) {
-        throw std::runtime_error("Routing entry not found");
-    }
-    return *longest_prefix_string;
-
+    throw std::runtime_error("Routing entry not found");
 }
     
 //////////////////////////////////////////////////////////////////////////
