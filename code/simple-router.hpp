@@ -46,12 +46,6 @@ public:
   void
   handlePacket(const Buffer& packet, const std::string& inIface);
 
-    void
-  handlePacket1(const Buffer& packet, const std::string& inIface);
-  
-    void
-  handlePacket2(const Buffer& packet, const std::string& inIface);
-
   /**
    * USE THIS METHOD TO SEND PACKETS
    *
