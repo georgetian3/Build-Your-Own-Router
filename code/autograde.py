@@ -108,7 +108,7 @@ def test_ping(net):
             score += 5
 
     # Ping from client to server1, check ARP cache, there should be 2 entries;
-    time.sleep(20) 
+    time.sleep(40)
     proper_arp_entry = True
     client.cmd("ping -c 1 {}".format(server1.IP()))
     lines = get_arp_line()
@@ -133,9 +133,8 @@ def test_ping(net):
     else:
         score += 5
 
-    proper_arp_entry = True
     # After 40 sencods, the ARP cache should be empty
-    time.sleep(10)
+    time.sleep(40)
     lines = get_arp_line()
     log.debug("ARP cache has {} entries after 40 s.".format(lines))
     if lines != 0 or not proper_arp_entry:
@@ -225,16 +224,10 @@ def test_download(net):
     else:
         score += 5
 
-    if not test_download_size(net, "10MB"):
-        log.error("*** Fail to download large file from http server: -10 pts")
-        details.append("*** Fail to download large file from http server: -10 pts")
-    else:
-        score += 10
-
 def test(net):
     test_ping(net)
-    #test_traceroute(net)
-    #test_download(net)
+    test_traceroute(net)
+    test_download(net)
 
 
 def main():
@@ -250,9 +243,10 @@ if __name__ == '__main__':
     # details = open('details.log', 'w')
     details = []
     main()
-    print ("Your tests score is {}/55 pts".format(score))
+    print ("Your tests score is {}/45 pts".format(score))
     print ("THIS IS NOT YOUR FINAL SCORE !!!")
-    details.insert(0, "Your tests score is {}/55 pts".format(score))
+    # details.write("Your tests score is {}/45 pts".format(score))
+    details.insert(0, "Your tests score is {}/45 pts".format(score))
     with open("details.log", "w") as f:
     	for detail in details:
             f.write(detail + '\n')

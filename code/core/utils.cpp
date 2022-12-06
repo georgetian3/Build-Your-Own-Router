@@ -259,7 +259,7 @@ void print_hdrs(const Buffer& buffer)
 }
 
 
-
+/* 
 ethernet_hdr* get_ether_h(const Buffer& packet) {
     return (ethernet_hdr*)packet.data();
 }
@@ -334,7 +334,7 @@ void set_icmp_h(icmp_hdr* icmp_h, icmp_msg type, size_t len) {
     }
     icmp_h->icmp_sum = 0;
     icmp_h->icmp_sum = cksum(icmp_h, len);
-}
+} */
 
 void print_section(const ::std::string& section, char c) {
     int n = 80 - 2 - section.length();

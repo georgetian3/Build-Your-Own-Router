@@ -32,8 +32,27 @@ namespace simple_router {
 //////////////////////////////////////////////////////////////////////////
 // IMPLEMENT THIS METHOD
 
-const Buffer broadcast_address = {'f', 'f', ':', 'f', 'f', ':', 'f', 'f', ':', 'f', 'f', ':', 'f', 'f', ':', 'f', 'f'};
+const Buffer broadcast_address = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
+void SimpleRouter::send_or_queue(const Buffer& packet, const Interface* iface) {
+    std::cerr << "Send or queue" << std::endl;
+    IP ip(packet);
+    auto arp_entry = m_arp.lookup(ip.get_ip_dst_ip());
+    if (arp_entry == nullptr) {
+        std::cerr << "Destination MAC uncached" << std::endl;
+        std::cerr << "Queuing following request:" << std::endl;
+        print_hdrs(packet);
+        m_arp.queueRequest(ip.get_ip_dst_ip(), packet, iface->name);
+        ARP arp_request(Buffer(sizeof(ethernet_hdr) + sizeof(arp_hdr)));
+        arp_request.make_arp_request(iface->ip, ip.get_ip_dst_ip(), iface->addr.data());
+        std::cerr << "Send ARP request" << std::endl;
+        sendPacket(arp_request.data(), iface->name);
+    } else {
+        std::cerr << "Destination MAC known, sending to " << macToString(arp_entry->mac) << std::endl;
+        ip.set_eth_dst(arp_entry->mac.data());
+        sendPacket(ip.data(), iface->name);
+    }
+}
 
 void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface) {
     print_section("handlePacket");
@@ -90,7 +109,7 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
                 return;
             } else {
                 for (const auto& pending: arp_requests->packets) {
-                    std::cerr << "Forwarding queued packets" << std::endl;
+                    std::cerr << "Sending queued packets" << std::endl;
                     IP forwarded(pending.packet);
                     forwarded.set_eth_src(findIfaceByName(pending.iface)->addr.data());
                     forwarded.set_eth_dst(arp.get_arp_src_mac().data());
@@ -110,7 +129,6 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
             std::cerr << "IP header too short, ignore" << std::endl;
             return;
         }
-
         if (!ip.verify_checksum()) {
             std::cerr << "IP checksum incorrect, ignore" << std::endl;
             return;
@@ -124,66 +142,53 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
             }
         }
 
-        /* Your router should classify datagrams into (1) destined to the router (to one of the IP addresses of
-        the router), and (2) datagrams to be forwarded: */
         if (ip_to_router) {
-            /* For (1), if packet carries ICMP payload, it should be properly dispatched. Otherwise, discarded
-            (a proper ICMP error response is NOT required for this project). */
+
             std::cerr << "IP to router" << std::endl;
             if (ip.get_ip_protocol() != ip_protocol_icmp) {
                 std::cerr << "Received non-ICMP, ignore" << std::endl;
                 return;
             }
             
-            auto icmp_h = get_icmp_h(packet);
-
-            uint16_t old_sum = icmp_h->icmp_sum;
-            icmp_h->icmp_sum = 0;
-            size_t icmp_len = packet.size() - sizeof(ethernet_hdr) - sizeof(ip_hdr);
-            if (cksum(icmp_h, icmp_len) != old_sum) {
+            ICMP icmp(packet);
+            if (!icmp.verify_length()) {
+                std::cerr << "ICMP header too short, ignore" << std::endl;
+                return;
+            }
+            if (!icmp.verify_checksum()) {
                 std::cerr << "ICMP checksum incorrect, ignore" << std::endl;
                 return;
             }
 
-            if (icmp_h->icmp_type != 8) { // if not echo request
+            if (icmp.get_icmp_type() != 8) { // if not echo request
                 std::cerr << "ICMP type unknown" << std::endl;
                 return;
             }
 
-            std::cerr << "Received ICMP echo request of length " << icmp_len << std::endl;
+            std::cerr << "Received ICMP echo request" << std::endl;
 
-            set_icmp_h(get_icmp_h(packet), echo_reply, icmp_len);
-            set_ip_h(get_ip_h(packet), sizeof(ip_hdr) + icmp_len, 64, ip_protocol_icmp, iface->ip, ip.get_ip_src_ip());
+            icmp.make_echo_reply(iface->addr.data());
 
-            auto arp_entry = m_arp.lookup(ip.get_ip_dst_ip());
-            if (arp_entry == nullptr) {
-                std::cerr << "Echo reply MAC unknown" << std::endl;
-                m_arp.queueRequest(ip.get_ip_dst_ip(), packet, inIface);
-                Buffer arp_request(sizeof(ethernet_hdr) + sizeof(arp_hdr));
-                set_arp_h(get_arp_h(arp_request), arp_op_request, ip.get_ip_src_ip(), ip.get_ip_dst_ip(), iface->addr.data(), nullptr);
-                set_ether_h(get_ether_h(arp_request), ethertype_arp, iface->addr.data(), nullptr);
-                std::cerr << "Send ARP request" << std::endl;
-                sendPacket(arp_request, inIface);
-                return;
-            }
-            
-            set_ether_h(get_ether_h(packet), ethertype_ip, iface->addr.data(), arp_entry->mac.data());
-            std::cerr << "Sending ICMP echo reply" << std::endl;
-            sendPacket(packet, inIface);
+            send_or_queue(icmp.data(), iface);
+
             return;
+
         }
 
 
         std::cerr << "IP to forward" << std::endl;
 
         if (ip.get_ip_ttl() == 0) {
-            std::cerr << "TTL = 0, ignore" << std::endl;
+            std::cerr << "TTL = 0, sending time exceeded ICMP" << std::endl;
+            ICMP icmp(packet);
+            icmp.make_time_exceeded(iface->ip, iface->addr.data(), 0);
+            send_or_queue(icmp.data(), iface);
             return; 
         }
 
-        ip.make_forwarded();
+        ip.make_forwarded(iface->addr.data());
 
-        std::cerr << "Forwarding IPv4 packet" << std::endl;
+        std::cerr << "Forwarding IP packet" << std::endl;
         RoutingTableEntry next_hop;
         try {
             next_hop = m_routingTable.lookup(ip.get_ip_dst_ip());
@@ -191,21 +196,9 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
             std::cerr << "Next hop lookup failed" << std::endl;
             return;
         }
-        auto outIface = findIfaceByName(next_hop.ifName);
-        auto arp_entry = m_arp.lookup(next_hop.dest);
-        if (arp_entry == nullptr) {
-            std::cerr << "Next hop MAC unknown" << std::endl;
-            m_arp.queueRequest(next_hop.gw, packet, next_hop.ifName);
-            Buffer arp_request(sizeof(ethernet_hdr) + sizeof(arp_hdr));
-            set_arp_h(get_arp_h(arp_request), arp_op_request, outIface->ip, next_hop.gw, outIface->addr.data(), nullptr);
-            set_ether_h(get_ether_h(arp_request), ethertype_arp, outIface->addr.data(), nullptr);
-            std::cerr << "Send ARP request" << std::endl;
-            sendPacket(arp_request, outIface->name);
-        } else {
-            set_ether_h(get_ether_h(packet), ethertype_ip, iface->addr.data(), arp_entry->mac.data());
-            std::cerr << "Forwarding packet" << std::endl;
-            sendPacket(packet, next_hop.ifName);
-        }
+        send_or_queue(ip.data(), findIfaceByName(next_hop.ifName));
+
+
     } else {
         // Your router should ignore Ethernet frames other than ARP and IPv4.
         std::cerr << "Unrecognized ethernet type" << std::endl;

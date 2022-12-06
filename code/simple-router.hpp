@@ -43,6 +43,11 @@ public:
    * interface \p inIface are passed in as parameters. The packet is
    * complete with ethernet headers.
    */
+
+  // ADDED
+  void
+  send_or_queue(const Buffer& packet, const Interface* iface);
+
   void
   handlePacket(const Buffer& packet, const std::string& inIface);
 

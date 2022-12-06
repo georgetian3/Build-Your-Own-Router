@@ -1,0 +1,7 @@
+--2022-12-07 00:09:52--  http://172.64.3.10/tmp.1K
+Connecting to 172.64.3.10:80... connected.
+HTTP request sent, awaiting response... Read error (Connection timed out) in headers.
+Retrying.
+
+--2022-12-07 00:34:01--  (try: 2)  http://172.64.3.10/tmp.1K
+Connecting to 172.64.3.10:80... failed: No route to host.

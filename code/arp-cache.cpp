@@ -27,54 +27,42 @@ namespace simple_router {
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 // IMPLEMENT THIS METHOD
-void
-ArpCache::periodicCheckArpRequestsAndCacheEntries()
-{
+void ArpCache::periodicCheckArpRequestsAndCacheEntries() {
 
     // FILL THIS IN
-    //print_section("BEGIN CheckArp");
     
-    const Interface* outIface;
-    for (auto arp_request_it = m_arpRequests.begin(); arp_request_it != m_arpRequests.end(); ++arp_request_it) {
-        auto arp_request = *arp_request_it;
-
+    for (const auto& arp_request: m_arpRequests) {
+        if (steady_clock::now() - arp_request->timeSent <= seconds(1)) {
+            continue;
+        }
         if (arp_request->nTimesSent >= MAX_SENT_TIME) {
-
-            for (const auto& q_packet: arp_request->packets) {
-
-                Buffer packet_out(sizeof(ethernet_hdr) + sizeof(ip_hdr) + sizeof(icmp_hdr));
-                set_icmp_h(get_icmp_h(packet_out), port_unreachable, packet_out.size());
-
-                
-                outIface = m_router.findIfaceByName(q_packet.iface);
-
-                auto ip_h = get_ip_h(packet_out);
-                set_ip_h(ip_h, sizeof(ip_hdr) + sizeof(icmp_hdr), 64, ip_protocol_icmp, 
-                    outIface->ip, outIface->ip //get_ip_h(q_packet->packet)->ip_dst
-                );
-                set_ether_h(get_ether_h(packet_out), ethertype_ip, outIface->addr.data(), get_ether_h(q_packet.packet)->ether_shost);
+            for (const auto& packet: arp_request->packets) {
+                auto outIface = m_router.findIfaceByName(packet.iface);
+                ICMP icmp(packet.packet);
+                icmp.make_host_unreachable(outIface->ip);
                 std::cout << "Send host unreachable\n";
-                m_router.sendPacket(packet_out, outIface->name);
+                m_router.sendPacket(icmp.data(), outIface->name);
             }
             removeRequest(arp_request);
         } else {
-            Buffer packet_out(sizeof(ethernet_hdr) + sizeof(arp_hdr));
             arp_request->timeSent = steady_clock::now();
             arp_request->nTimesSent++;
             std::cout << "Resending ARP request\n";
-            outIface = m_router.findIfaceByName(arp_request->packets.front().iface);
-            set_arp_h(get_arp_h(packet_out), arp_op_request, outIface->ip, arp_request->ip, outIface->addr.data(), nullptr);
-            set_ether_h(get_ether_h(packet_out), ethertype_arp, outIface->addr.data(), nullptr);
-
-            m_router.sendPacket(packet_out, outIface->name);
+            auto outIface = m_router.findIfaceByName(arp_request->packets.front().iface);
+            ARP arp;
+            return;
+            arp.make_arp_request(outIface->ip, arp_request->ip, outIface->addr.data());
+            m_router.sendPacket(arp.data(), outIface->name);
         }
     }
 
-    // remove invalid cache entries
+    // remove old cache entries
     for (auto it = m_cacheEntries.begin(); it != m_cacheEntries.end();) {
         if ((*it)->isValid) {
             ++it;
         } else {
+            std::cerr << "Removing cache: MAC " << macToString((*it)->mac) << " IP: ";
+            print_addr_ip_int(ntohl((*it)->ip));
             it = m_cacheEntries.erase(it);
         }
     }
