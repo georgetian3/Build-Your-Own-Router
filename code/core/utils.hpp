@@ -185,9 +185,13 @@ protected:
     static const size_t min_length = sizeof(ethernet_hdr) + sizeof(ip_hdr);
     void set_ttl(const uint8_t ttl) {ip_h->ip_ttl = ttl;}
 
-    void make_checksum() {
+    void make_ip_cksum() {
         ip_h->ip_sum = 0;
         ip_h->ip_sum = cksum(ip_h, sizeof(ip_hdr));
+    }
+    void set_len() {
+        std::cerr << "set len IP len " << (m_data.size() - sizeof(ethernet_hdr)) << std::endl;
+        ip_h->ip_len = (m_data.size() - sizeof(ethernet_hdr));
     }
 public:
     IP(const size_t len): Ethernet(len) {}
@@ -205,25 +209,27 @@ public:
     uint32_t get_ip_src_ip () const {return ip_h->ip_src;}
     uint32_t get_ip_dst_ip () const {return ip_h->ip_dst;}
     uint8_t get_ip_protocol() const {return ip_h->ip_p;}
+    uint16_t get_ip_id     () const {return ntohs(ip_h->ip_id);}
+    void set_ip_id(uint16_t id) {ip_h->ip_id = htons(id);}
     void set_ip_src_ip(uint32_t src) {ip_h->ip_src = src;}
     void set_ip_dst_ip(uint32_t dst) {ip_h->ip_dst = dst;}
 
     void make_reply(const uint32_t src_ip) {
-        ip_h->ip_len = m_data.size() - sizeof(ethernet_hdr);
-        ip_h->ip_id = 0; //??
-        ip_h->ip_off = 0; //??
+        set_len();
+        //ip_h->ip_id = 0; //??
+        //ip_h->ip_off = 0; //??
         set_ttl(64);
         ip_h->ip_p = ip_protocol_icmp;
         set_ip_dst_ip(get_ip_src_ip());
         set_ip_src_ip(src_ip);
-        make_checksum();
+        make_ip_cksum();
         set_eth_src(get_eth_dst().data());
     }
 
 
     void make_forwarded(const uint8_t* src_mac) {
         ip_h->ip_ttl--;
-        make_checksum();
+        make_ip_cksum();
         set_eth_src(src_mac);
     }
 
@@ -241,9 +247,17 @@ protected:
         icmp_h->icmp_sum = 0;
         icmp_h->icmp_sum = cksum(icmp_h, m_data.size() - header_offset);
     }
+    void add_icmp_data() {
+        // ICMP header + unused + Internet header + 64 bits (8 bytes)
+        m_data.resize(min_length + 4 + sizeof(ip_hdr) + 8, 0);
+        memmove(icmp_h + 4, ip_h, sizeof(ip_hdr) + 8);
+    }
     void make_unreachable(uint8_t type, uint8_t code, uint32_t src_ip) {
+        std::cerr << "make unreachable" << std::endl;
         icmp_h->icmp_type = type;
         icmp_h->icmp_code = code;
+        //add_icmp_data();
+        m_data.resize(min_length);
         make_icmp_cksum();
         make_reply(src_ip);
     }
@@ -270,24 +284,16 @@ public:
         icmp_h->icmp_type = 0;
         icmp_h->icmp_code = 0;
         make_icmp_cksum();
-
-        uint32_t tmp = get_ip_src_ip();
-        set_ip_src_ip(get_ip_dst_ip());
-        set_ip_dst_ip(tmp);
-
+        make_reply(get_ip_dst_ip());
         set_eth_src(src_mac);
     }
 
     void make_time_exceeded(const uint32_t src_ip, const uint8_t* src_mac, const uint8_t* dst_mac) {
         icmp_h->icmp_type = 11;
         icmp_h->icmp_code = 0;
-        // Internet header + 64 bits = 8 bytes of original datagram
-        memmove(icmp_h + sizeof(icmp_hdr) * 2, ip_h, sizeof(ip_hdr) + 8);
         set_ttl(64);
-        set_ip_dst_ip(get_ip_src_ip());
-        set_ip_src_ip(src_ip);
-        set_eth_src(src_mac);
-        set_eth_dst(dst_mac);
+        add_icmp_data();
+        make_reply(src_ip);
     }
 
     void make_host_unreachable(uint32_t src_ip) {make_unreachable(3, 1, src_ip);}

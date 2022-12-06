@@ -145,8 +145,19 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
         if (ip_to_router) {
 
             std::cerr << "IP to router" << std::endl;
+
+            if (ip.get_ip_protocol() == 6 || // TCP
+                ip.get_ip_protocol() == 17) { // UDP
+
+                std::cerr << "Received TCP or UDP" << std::endl;
+                ICMP icmp(packet);
+                icmp.make_port_unreachable(iface->ip);
+                std::cerr << "Sending port unreachable" << std::endl;
+                send_or_queue(icmp.data(), iface);
+                return;
+            }
             if (ip.get_ip_protocol() != ip_protocol_icmp) {
-                std::cerr << "Received non-ICMP, ignore" << std::endl;
+                std::cerr << "Received unknown IP protocol: " << (int)ip.get_ip_protocol() << ", ignore" << std::endl;
                 return;
             }
             
