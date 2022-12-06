@@ -210,11 +210,7 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
             return; 
         }
 
-        ip_h->ip_ttl--;
-        ip_h->ip_sum = 0;                              // Reset checksum
-        ip_h->ip_sum = cksum(ip_h, sizeof(ip_hdr)); // Recalculate the checksum due to TTL change
-
-        //set_ip_h(ip_h, packet.size() - sizeof(ethernet_hdr), ip_h->ip_ttl - 1, ip_h->ip_p, ip_h->ip_src, ip_h->ip_dst);
+        set_ip_h(ip_h, ip_h->ip_len, ip_h->ip_ttl - 1, ip_h->ip_p, ip_h->ip_src, ip_h->ip_dst);
 
         std::cerr << "Forwarding IPv4 packet" << std::endl;
         RoutingTableEntry next_hop;
@@ -228,7 +224,6 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
         auto arp_entry = m_arp.lookup(next_hop.dest);
         if (arp_entry == nullptr) {
             std::cerr << "Next hop MAC unknown" << std::endl;
-
             m_arp.queueRequest(next_hop.gw, packet, next_hop.ifName);
             Buffer arp_request(sizeof(ethernet_hdr) + sizeof(arp_hdr));
             arp_hdr *arp_req_head = reinterpret_cast<arp_hdr *>(arp_request.data() + sizeof(ethernet_hdr));
