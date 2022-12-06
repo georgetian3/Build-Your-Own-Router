@@ -88,204 +88,164 @@ void print_addr_eth(const uint8_t* addr);
 Buffer make_buffer(const uint8_t* data, size_t len);
 Buffer concat_buf(const Buffer& a, const Buffer& b);
 
-class Ethernet {
 
-private:
-
-    ethernet_hdr m_h;
+class Layer {
+protected:
     Buffer m_data;
-
+    size_t min_length = 0;
 public:
+    Layer(const Buffer& packet) {m_data = packet;}
+    Buffer data() const {return m_data;}
+    virtual bool verify_length() const {return m_data.size() >= min_length;};
+};
 
-    Ethernet() {}
-    Ethernet(const Buffer& packet) {
-        memcpy(&m_h, packet.data(), sizeof(ethernet_hdr));
-        m_data = Buffer(packet.begin() + sizeof(ethernet_hdr), packet.end());
+class Ethernet: public Layer {
+private:
+    ethernet_hdr* eth_h;
+public:
+    Ethernet(const Buffer& packet): Layer(packet) {
+        eth_h = (ethernet_hdr*)m_data.data();
+        min_length += sizeof(ethernet_hdr);        
     }
-    uint16_t get_type() const {
-        return ntohs(m_h.ether_type);
-    }
-    void set_type(uint16_t type) {
-        m_h.ether_type = ntohs(type);
-    }
-    Buffer get_src() const {
-        Buffer buf(ETHER_ADDR_LEN);
-        memcpy(buf.data(), m_h.ether_shost, ETHER_ADDR_LEN);
-        return buf;
-    }
-    void set_src(const uint8_t* src) {
+    
+    uint16_t get_eth_type() const      {return ntohs(eth_h->ether_type);}
+    Buffer get_eth_src() const         {return make_buffer(eth_h->ether_shost, ETHER_ADDR_LEN);}
+    Buffer get_eth_dst() const         {return make_buffer(eth_h->ether_dhost, ETHER_ADDR_LEN);}
+    void set_eth_type(uint16_t type)   {eth_h->ether_type = ntohs(type);}
+
+    void set_eth_src(const uint8_t* src) {
         if (src) {
-            memcpy(m_h.ether_shost, src, ETHER_ADDR_LEN);
+            memcpy(eth_h->ether_shost, src, ETHER_ADDR_LEN);
         }
     }
-    Buffer get_dst() const {
-        Buffer buf(ETHER_ADDR_LEN);
-        memcpy(buf.data(), m_h.ether_shost, ETHER_ADDR_LEN);
-        return buf;
-    }
-    void set_dst(const uint8_t* dst) {
+
+    void set_eth_dst(const uint8_t* dst) {
         // set dst to 0 for broadcast
         if (dst) {
-            memcpy(m_h.ether_dhost, dst, ETHER_ADDR_LEN);
+            memcpy(eth_h->ether_dhost, dst, ETHER_ADDR_LEN);
         } else {
-            memset(m_h.ether_dhost, 0xff, ETHER_ADDR_LEN);
+            memset(eth_h->ether_dhost, 0xff, ETHER_ADDR_LEN);
         }
-    }
-    Buffer get_data() const {
-        return m_data;
-    }
-    void set_data(Buffer data) {
-        m_data = data;
-    }
-    Ethernet(uint16_t type, const uint8_t* src, uint8_t* dst, Buffer data) {
-        set_type(type);
-        set_src(src);
-        set_dst(dst);
-        set_data(data);
-    }
-    Buffer get_packet() {
-        Buffer hdr(sizeof(ethernet_hdr));
-        memcpy(hdr.data(), &m_h, sizeof(ethernet_hdr));
-        return concat_buf(hdr, m_data);
     }
 };
 
-
-
-
-
-
-
-class ARP {
-
+class ARP: public Ethernet {
 private:
-
-    arp_hdr m_h;
-
-    void set_defaults() {
-        m_h.arp_hrd = htons(arp_hrd_ethernet);
-        m_h.arp_pro = htons(ethertype_ip);
-        m_h.arp_hln = ETHER_ADDR_LEN;
-        m_h.arp_pln = sizeof(uint32_t);
+    arp_hdr* arp_h;
+    void set_arp_defaults() {
+        arp_h->arp_hrd = htons(arp_hrd_ethernet);
+        arp_h->arp_pro = htons(ethertype_ip);
+        arp_h->arp_hln = ETHER_ADDR_LEN;
+        arp_h->arp_pln = sizeof(uint32_t);
+        set_eth_type(ethertype_arp);
     }
-
 public:
-
-    ARP() {
-        set_defaults();
+    ARP(const Buffer& packet): Ethernet(packet) {
+        arp_h = (arp_hdr*)(m_data.data() + sizeof(ethernet_hdr));
+        min_length += sizeof(ethernet_hdr);
+        set_arp_defaults();
     }
-    ARP(const Buffer& packet) {
-        memcpy(&m_h, packet.data() + sizeof(ethernet_hdr), sizeof(arp_hdr));
+    unsigned short get_arp_opcode() const {return ntohs(arp_h->arp_op);}
+    Buffer get_arp_src_mac() const    {return make_buffer(arp_h->arp_sha, ETHER_ADDR_LEN);}
+    uint32_t get_arp_src_ip() const   {return arp_h->arp_sip;}
+    uint32_t get_arp_dst_ip() const   {return arp_h->arp_tip;}
+
+    void make_arp_request(uint32_t src_ip, uint32_t dst_ip, const uint8_t* src_mac) {
+        arp_h->arp_op = htons(arp_op_request);
+
+        arp_h->arp_sip = src_ip;
+        arp_h->arp_tip = dst_ip;
+
+        memcpy(arp_h->arp_sha, src_mac, ETHER_ADDR_LEN);
+        memset(arp_h->arp_tha, 0xff, ETHER_ADDR_LEN);
+
+        set_eth_src(src_mac);
+        set_eth_dst(0);
     }
-    unsigned short get_opcode() const {
-        return m_h.arp_op;
-    }
-
-    Buffer get_src_mac() const {
-        return make_buffer(m_h.arp_sha, ETHER_ADDR_LEN);
-    }
-
-    uint32_t get_src_ip() const {
-        return m_h.arp_sip;
-    }
-
-    uint32_t get_dst_ip() const {
-        return m_h.arp_tip;
-    }
-
-    Buffer make_request(uint32_t src_ip, uint32_t dst_ip, const uint8_t* src_mac) {
-        m_h.arp_op = htons(arp_op_request);
-
-        m_h.arp_sip = src_ip;
-        m_h.arp_tip = dst_ip;
-
-        memcpy(m_h.arp_sha, src_mac, ETHER_ADDR_LEN);
-        memset(m_h.arp_tha, 0xff, ETHER_ADDR_LEN);
-
-        return Ethernet((uint16_t)ethertype_arp, src_mac, 0,
-            make_buffer((const uint8_t*)&m_h, sizeof(arp_hdr))
-        ).get_packet();
-    }
-
-    Buffer make_reply(const Buffer& request, const uint8_t* src_mac) {
-        m_h.arp_op = htons(arp_op_reply);
-        auto arp_h = (arp_hdr*)(request.data() + sizeof(ethernet_hdr));
+    void make_arp_reply(const uint8_t* src_mac) {
+        arp_h->arp_op = htons(arp_op_reply);
 
         // old src mac is new dst mac
-        memcpy(m_h.arp_tha, arp_h->arp_sha, ETHER_ADDR_LEN);
-        memcpy(m_h.arp_sha, src_mac, ETHER_ADDR_LEN);
+        memcpy(arp_h->arp_tha, arp_h->arp_sha, ETHER_ADDR_LEN);
+        memcpy(arp_h->arp_sha, src_mac, ETHER_ADDR_LEN);
 
         // src and dst ips are swapped
-        m_h.arp_sip = arp_h->arp_tip;
-        m_h.arp_tip = arp_h->arp_sip;
+        uint32_t tmp = arp_h->arp_sip;
+        arp_h->arp_sip = arp_h->arp_tip;
+        arp_h->arp_tip = tmp;
 
-        return Ethernet(ethertype_arp, src_mac, arp_h->arp_sha,
-            make_buffer((const uint8_t*)&m_h, sizeof(arp_hdr))
-        ).get_packet();
+        set_eth_src(src_mac);
+        set_eth_dst(arp_h->arp_tha);
+
     }
-
 
 };
     
 
-class IP {
-
+class IP: public Ethernet {
 private:
-
-    ip_hdr m_h;
-    Buffer data;
-
+    ip_hdr* ip_h;
 public:
 
-    IP() {}
-
-    IP(const Buffer& packet) {
-        memcpy(&m_h, packet.data() + sizeof(ethernet_hdr), sizeof(ip_hdr));
-        data = Buffer(packet.begin() + sizeof(ethernet_hdr), packet.end());
+    IP(const Buffer& packet): Ethernet(packet) {
+        ip_h = (ip_hdr*)(m_data.data() + sizeof(ethernet_hdr));
+        min_length += sizeof(ip_hdr);
     }
 
-    void decrement_ttl() {
-        m_h.ip_ttl--;
+    bool verify_checksum() {
+        uint16_t old_sum = ip_h->ip_sum;
+        ip_h->ip_sum = 0;
+        return cksum(ip_h, sizeof(ip_hdr)) == old_sum;
     }
 
-    bool ttl_valid() const {
-        return m_h.ip_ttl > 0;
+    uint8_t get_ip_ttl     () const {return ip_h->ip_ttl;}
+    uint32_t get_ip_src_ip () const {return ip_h->ip_src;}
+    uint32_t get_ip_dst_ip () const {return ip_h->ip_dst;}
+    uint8_t get_ip_protocol() const {return ip_h->ip_p;}
+    void set_ip_src_ip(uint32_t src) {ip_h->ip_src = src;}
+    void set_ip_dst_ip(uint32_t dst) {ip_h->ip_dst = dst;}
+
+
+    void make_forwarded() {
+        ip_h->ip_ttl--;
+        ip_h->ip_sum = 0;
+        ip_h->ip_sum = cksum(ip_h, sizeof(ip_hdr));
     }
 
-    static Buffer make_forwarded(const Buffer& packet, const uint8_t* src_mac, const uint8_t* dst_mac) {
-        IP forwarded_ip(packet);
-        forwarded_ip.decrement_ttl();
-        Ethernet forwarded_ether(forwarded_ip.get_packet());
-        forwarded_ether.set_src(src_mac);
-        forwarded_ether.set_dst(dst_mac);
-        return forwarded_ether.get_packet();
-    }
-
-    Buffer get_packet() {
-        return concat_buf(make_buffer((const uint8_t*)&m_h, sizeof(ip_hdr)), data);
-    };
 
 };
 
 
-class ICMP {
+class ICMP: IP {
 
 private:
+    const size_t header_offset = sizeof(ethernet_hdr) + sizeof(ip_hdr);
+    icmp_hdr* icmp_h;
 
-    icmp_hdr m_h;
-    Buffer data;
-
+    void make_cksum() {
+        icmp_h->icmp_sum = 0;
+        icmp_h->icmp_sum = cksum(icmp_h, m_data.size() - header_offset);
+    }
 public:
 
-    ICMP() {}
-    ICMP(const Buffer& packet) {
-        memcpy(&m_h, packet.data() + sizeof(ethernet_hdr) + sizeof(ip_hdr), sizeof(icmp_hdr));
-        data = Buffer(packet.begin() + sizeof(ethernet_hdr) + sizeof(ip_hdr) + sizeof(icmp_hdr), packet.end());
+    ICMP(const Buffer& packet): IP(packet) {
+        icmp_h = (icmp_hdr*)(m_data.data() + header_offset);
+        min_length += sizeof(icmp_hdr);
     }
 
-    Buffer echo_reply(const Buffer& packet) {
-        Buffer reply = packet;
-        
+    void make_echo_request() {
+        icmp_h->icmp_type = 8;
+        icmp_h->icmp_code = 0;
+        make_cksum();
+    }
+
+    void make_echo_reply(const uint8_t* src_mac, const uint8_t* dst_mac) {
+        icmp_h->icmp_type = 0;
+        icmp_h->icmp_code = 0;
+        make_cksum();
+        uint32_t tmp = get_ip_src_ip();
+        set_ip_src_ip(get_ip_dst_ip());
+        set_ip_dst_ip(tmp);
     }
 
 };

@@ -89,7 +89,7 @@ def test_ping(net):
     server1, server2, client, router = net.get( 'server1', 'server2', 'client', 'sw0')
 
     # test ping reachablility
-    """ for src in net.hosts:
+    for src in net.hosts:
         ping_success = True
         for dest in net.hosts:
             if (src == dest):
@@ -131,7 +131,7 @@ def test_ping(net):
         log.error ("*** Fail to maintain ARP cache entries properly: -5 pts")
         details.append("*** Fail to maintain ARP cache entries properly: -5 pts")
     else:
-        score += 5 """
+        score += 5
 
     proper_arp_entry = True
     # After 40 sencods, the ARP cache should be empty

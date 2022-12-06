@@ -105,19 +105,6 @@ struct ip_hdr
   uint32_t ip_src, ip_dst;         /* source and dest address */
 } __attribute__ ((packed)) ;
 
-////////////////////////////////////////////////////
-// ADDED
-
-struct icmp_hdr2 {
-  uint8_t type;
-  uint8_t code;
-  uint16_t cksum;
-  uint16_t id;
-  uint16_t seq;
-} __attribute__ ((packed));
-
-///////////////////////////////////////////////////
-
 /*
  *  Ethernet packet header prototype.  Too many O/S's define this differently.
  *  Easy enough to solve that and define it here.
