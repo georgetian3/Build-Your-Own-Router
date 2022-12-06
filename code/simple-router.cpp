@@ -62,52 +62,48 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
     
     auto ether_h = get_ether_h(packet);
 
-    if (ntohs(ether_h->ether_type) == ethertype_arp)
-    {
-        std::cerr << "Handling ARP packet" << std::endl;
-        if (packet.size() < sizeof(ethernet_hdr) + sizeof(arp_hdr)) // Packet size is smaller than required, ignore
-        {
-            std::cerr << "Invalid packet size, too small for ARP, ignoring" << std::endl;
+    if (ntohs(ether_h->ether_type) == ethertype_arp) {
+        std::cerr << "Received ARP packet" << std::endl;
+
+        if (packet.size() < sizeof(ethernet_hdr) + sizeof(arp_hdr)) {
+            std::cerr << "ARP packet too short, ignore" << std::endl;
             return;
         }
-        arp_hdr *arp_head = const_cast<arp_hdr *>(reinterpret_cast<const arp_hdr *>((packet.data() + sizeof(ethernet_hdr)))); // Get the ARP header by getting the memory starting past the ethernet header
-        uint16_t op_type = ntohs(arp_head->arp_op);
-        if (op_type == arp_op_request) // ARP request, 0x0001 in hex
-        {
-            std::cerr << "Handling ARP request" << std::endl;
-            if (arp_head->arp_tip != iface->ip) // ARP IP not equal to interface IP, drop it
-            {
-                std::cerr << "Invalid packet, ARP IP and interface IP not equal, ignoring" << std::endl;
+
+        auto arp_h = get_arp_h(packet);
+        if (ntohs(arp_h->arp_op) == arp_op_request) {
+            std::cerr << "Received ARP request" << std::endl;
+            if (arp_h->arp_tip != iface->ip) {
+                std::cerr << "ARP dest IP != iface IP, ignore" << std::endl;
                 return;
             }
+            
             Buffer buf(sizeof(ethernet_hdr) + sizeof(arp_hdr)); // Buffer for reply packet
             ethernet_hdr *reply_eth_head = reinterpret_cast<ethernet_hdr *>(buf.data());
             ;                                                                                         // Reserve memory for ethernet header
-            arp_hdr *reply_arp_head = reinterpret_cast<arp_hdr *>(buf.data() + sizeof(ethernet_hdr)); // Reserve memory after ethernet header for ARP header
+            arp_hdr *reply_arp_h = reinterpret_cast<arp_hdr *>(buf.data() + sizeof(ethernet_hdr)); // Reserve memory after ethernet header for ARP header
             // Construct ethernet header
             memcpy(reply_eth_head->ether_shost, iface->addr.data(), ETHER_ADDR_LEN);   // Copy interface to be source
-            memcpy(reply_eth_head->ether_dhost, &(arp_head->arp_sha), ETHER_ADDR_LEN); // Copy ARP frame for dest
+            memcpy(reply_eth_head->ether_dhost, &(arp_h->arp_sha), ETHER_ADDR_LEN); // Copy ARP frame for dest
             reply_eth_head->ether_type = htons(ethertype_arp);
             // Construct ARP header, mostly copy from existing, swap destination and sources
-            reply_arp_head->arp_hrd = htons(ETHER_ADDR_LEN);
-            reply_arp_head->arp_pro = htons(ethertype_ip);
-            reply_arp_head->arp_hln = ETHER_ADDR_LEN;
-            reply_arp_head->arp_pln = 4;
-            reply_arp_head->arp_op = htons(arp_op_reply);                          // Reply opcode, switch endianness of bytes
-            reply_arp_head->arp_sip = iface->ip;                                   // Switch source and dest
-            reply_arp_head->arp_tip = arp_head->arp_sip;                           // Switch source and dest
-            memcpy(reply_arp_head->arp_tha, &(arp_head->arp_sha), ETHER_ADDR_LEN); // Switch source and dest
-            memcpy(reply_arp_head->arp_sha, iface->addr.data(), ETHER_ADDR_LEN);   // Switch source and dest
+            reply_arp_h->arp_hrd = htons(ETHER_ADDR_LEN);
+            reply_arp_h->arp_pro = htons(ethertype_ip);
+            reply_arp_h->arp_hln = ETHER_ADDR_LEN;
+            reply_arp_h->arp_pln = 4;
+            reply_arp_h->arp_op = htons(arp_op_reply);                          // Reply opcode, switch endianness of bytes
+            reply_arp_h->arp_sip = iface->ip;                                   // Switch source and dest
+            reply_arp_h->arp_tip = arp_h->arp_sip;                           // Switch source and dest
+            memcpy(reply_arp_h->arp_tha, &(arp_h->arp_sha), ETHER_ADDR_LEN); // Switch source and dest
+            memcpy(reply_arp_h->arp_sha, iface->addr.data(), ETHER_ADDR_LEN);   // Switch source and dest
             std::cerr << "Created ARP reply in response of request" << std::endl;
             sendPacket(buf, iface->name); // Send the created reply packet
-        }
-        else if (op_type == arp_op_reply) // ARP reply, 0x0002 in hex
-        {
+        } else if (ntohs(arp_h->arp_op) == arp_op_reply) {
             std::cerr << "Handling ARP reply" << std::endl;
             Buffer mBuf(ETHER_ADDR_LEN);                                 // Buffer for MAC/IP combo to insert into the ARP cache
             uint8_t *mac_ptr = reinterpret_cast<uint8_t *>(mBuf.data()); // Pointer to the buffer
-            memcpy(mac_ptr, arp_head->arp_sha, ETHER_ADDR_LEN);
-            auto arpReqEntry = m_arp.insertArpEntry(mBuf, (uint32_t)(arp_head->arp_sip));
+            memcpy(mac_ptr, arp_h->arp_sha, ETHER_ADDR_LEN);
+            auto arpReqEntry = m_arp.insertArpEntry(mBuf, (uint32_t)(arp_h->arp_sip));
             if (arpReqEntry != nullptr) // && !arpReqEntry->packets.empty()) //All good to forward
             {
                 for (auto p = arpReqEntry->packets.begin(); p != arpReqEntry->packets.end(); ++p)
@@ -277,33 +273,33 @@ SimpleRouter::handlePacket2(const Buffer& packet, const std::string& inIface)
       std::cerr << "Invalid packet size, too small for ARP, ignoring" << std::endl;
       return;
     }
-    arp_hdr *arp_head = const_cast<arp_hdr *>(reinterpret_cast<const arp_hdr *>((packet.data() + sizeof(ethernet_hdr)))); //Get the ARP header by getting the memory starting past the ethernet header
-    uint16_t op_type = ntohs(arp_head -> arp_op);
+    arp_hdr *arp_h = const_cast<arp_hdr *>(reinterpret_cast<const arp_hdr *>((packet.data() + sizeof(ethernet_hdr)))); //Get the ARP header by getting the memory starting past the ethernet header
+    uint16_t op_type = ntohs(arp_h -> arp_op);
     if (op_type == arp_op_request) //ARP request, 0x0001 in hex
     {
       std::cerr << "Handling ARP request" << std::endl;
-      if (arp_head -> arp_tip != iface -> ip) //ARP IP not equal to interface IP, drop it
+      if (arp_h -> arp_tip != iface -> ip) //ARP IP not equal to interface IP, drop it
       {
         std::cerr << "Invalid packet, ARP IP and interface IP not equal, ignoring" << std::endl;
         return;
       }
       Buffer buf(sizeof(ethernet_hdr) + sizeof(arp_hdr)); //Buffer for reply packet
       ethernet_hdr * reply_eth_head = reinterpret_cast<ethernet_hdr *>(buf.data());; //Reserve memory for ethernet header
-      arp_hdr * reply_arp_head = reinterpret_cast<arp_hdr *>(buf.data()+ sizeof(ethernet_hdr)); //Reserve memory after ethernet header for ARP header
+      arp_hdr * reply_arp_h = reinterpret_cast<arp_hdr *>(buf.data()+ sizeof(ethernet_hdr)); //Reserve memory after ethernet header for ARP header
       //Construct ethernet header
       memcpy(reply_eth_head -> ether_shost, iface -> addr.data(), ETHER_ADDR_LEN); //Copy interface to be source
-      memcpy(reply_eth_head -> ether_dhost, &(arp_head -> arp_sha), ETHER_ADDR_LEN); //Copy ARP frame for dest
+      memcpy(reply_eth_head -> ether_dhost, &(arp_h -> arp_sha), ETHER_ADDR_LEN); //Copy ARP frame for dest
       reply_eth_head -> ether_type = htons(ethertype_arp);
       //Construct ARP header, mostly copy from existing, swap destination and sources
-      reply_arp_head -> arp_hrd = htons(ETHER_ADDR_LEN);
-      reply_arp_head -> arp_pro = htons(ethertype_ip);
-      reply_arp_head -> arp_hln = ETHER_ADDR_LEN;
-      reply_arp_head -> arp_pln = 4;
-      reply_arp_head -> arp_op = htons(arp_op_reply); //Reply opcode, switch endianness of bytes
-      reply_arp_head -> arp_sip = iface -> ip; //Switch source and dest
-      reply_arp_head -> arp_tip = arp_head -> arp_sip; //Switch source and dest
-      memcpy(reply_arp_head -> arp_tha, &(arp_head -> arp_sha), ETHER_ADDR_LEN); //Switch source and dest
-      memcpy(reply_arp_head -> arp_sha, iface -> addr.data(), ETHER_ADDR_LEN); //Switch source and dest
+      reply_arp_h -> arp_hrd = htons(ETHER_ADDR_LEN);
+      reply_arp_h -> arp_pro = htons(ethertype_ip);
+      reply_arp_h -> arp_hln = ETHER_ADDR_LEN;
+      reply_arp_h -> arp_pln = 4;
+      reply_arp_h -> arp_op = htons(arp_op_reply); //Reply opcode, switch endianness of bytes
+      reply_arp_h -> arp_sip = iface -> ip; //Switch source and dest
+      reply_arp_h -> arp_tip = arp_h -> arp_sip; //Switch source and dest
+      memcpy(reply_arp_h -> arp_tha, &(arp_h -> arp_sha), ETHER_ADDR_LEN); //Switch source and dest
+      memcpy(reply_arp_h -> arp_sha, iface -> addr.data(), ETHER_ADDR_LEN); //Switch source and dest
       std::cerr << "Created ARP reply in response of request" << std::endl;
       sendPacket(buf, iface->name); //Send the created reply packet
     }
@@ -312,8 +308,8 @@ SimpleRouter::handlePacket2(const Buffer& packet, const std::string& inIface)
       std::cerr << "Handling ARP reply" << std::endl;
       Buffer mBuf(ETHER_ADDR_LEN); //Buffer for MAC/IP combo to insert into the ARP cache
       uint8_t * mac_ptr = reinterpret_cast<uint8_t *>(mBuf.data()); //Pointer to the buffer
-      memcpy(mac_ptr, arp_head -> arp_sha, ETHER_ADDR_LEN);
-      auto arpReqEntry = m_arp.insertArpEntry(mBuf, (uint32_t) (arp_head -> arp_sip));
+      memcpy(mac_ptr, arp_h -> arp_sha, ETHER_ADDR_LEN);
+      auto arpReqEntry = m_arp.insertArpEntry(mBuf, (uint32_t) (arp_h -> arp_sip));
       if (arpReqEntry != nullptr) // && !arpReqEntry->packets.empty()) //All good to forward
       {
         for (auto p = arpReqEntry->packets.begin(); p != arpReqEntry->packets.end(); ++p)
