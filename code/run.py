@@ -116,5 +116,5 @@ def main():
     stop_topo(net)
 
 if __name__ == '__main__':
-    setLogLevel( 'info' )
+    setLogLevel( 'debug' )
     main()

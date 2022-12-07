@@ -32,9 +32,6 @@ void ArpCache::periodicCheckArpRequestsAndCacheEntries() {
 
     
     for (auto arp_request = m_arpRequests.begin(); arp_request != m_arpRequests.end(); ) {
-        /* if (steady_clock::now() - (*arp_request)->timeSent <= seconds(1)) {
-            continue;
-        } */
         if ((*arp_request)->nTimesSent >= MAX_SENT_TIME) {
             // send host unreachable ICMP
             for (auto packet: (*arp_request)->packets) {

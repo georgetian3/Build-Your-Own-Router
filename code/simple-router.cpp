@@ -177,7 +177,7 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
 
         }
 
-        ip.decrement_ttl();
+        ip.make_forwarded(iface->addr.data());
         if (ip.get_ip_ttl() == 0) {
             std::cerr << "TTL = 0, sending time exceeded ICMP" << std::endl;
             ICMP icmp(packet);
@@ -189,7 +189,6 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
 
         std::cerr << "IP to forward" << std::endl;
 
-        ip.make_forwarded(iface->addr.data());
 
         
 

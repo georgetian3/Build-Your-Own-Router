@@ -2,9 +2,6 @@
 #include "core/utils.hpp"
 
 namespace simple_router {
-
-Buffer make_buffer(const uint8_t* data, size_t len);
-Buffer concat_buf(const Buffer& a, const Buffer& b);
     
 class PDU {
 protected:
@@ -23,10 +20,10 @@ protected:
 public:
     Ethernet(const Buffer& packet): PDU(packet) {eth_h = (ethernet_hdr*)m_data.data();}
     
-    uint16_t get_eth_type() const      {return ntohs(eth_h->ether_type);}
-    Buffer get_eth_src() const         {return make_buffer(eth_h->ether_shost, ETHER_ADDR_LEN);}
-    Buffer get_eth_dst() const         {return make_buffer(eth_h->ether_dhost, ETHER_ADDR_LEN);}
-    void set_eth_type(uint16_t type)   {eth_h->ether_type = ntohs(type);}
+    uint16_t get_eth_type() const        {return ntohs(eth_h->ether_type);}
+    Buffer   get_eth_src()  const        {return Buffer(eth_h->ether_shost, eth_h->ether_shost + ETHER_ADDR_LEN);}
+    Buffer   get_eth_dst()  const        {return Buffer(eth_h->ether_dhost, eth_h->ether_dhost + ETHER_ADDR_LEN);}
+    void     set_eth_type(uint16_t type) {eth_h->ether_type = ntohs(type);}
 
     void set_eth_src(const uint8_t* src) {
         if (src) {
@@ -64,10 +61,11 @@ protected:
 public:
     ARP(): ARP(Buffer(min_length)) {}
     ARP(const Buffer& packet): Ethernet(packet) {set_arp_defaults();}
-    unsigned short get_arp_opcode() const {return ntohs(arp_h->arp_op);}
-    Buffer get_arp_src_mac() const    {return make_buffer(arp_h->arp_sha, ETHER_ADDR_LEN);}
-    uint32_t get_arp_src_ip() const   {return arp_h->arp_sip;}
-    uint32_t get_arp_dst_ip() const   {return arp_h->arp_tip;}
+
+    unsigned short get_arp_opcode () const {return ntohs(arp_h->arp_op);}
+    Buffer         get_arp_src_mac() const {return Buffer(arp_h->arp_sha, arp_h->arp_sha + ETHER_ADDR_LEN);}
+    uint32_t       get_arp_src_ip () const {return arp_h->arp_sip;}
+    uint32_t       get_arp_dst_ip () const {return arp_h->arp_tip;}
 
     void make_arp_request(uint32_t src_ip, uint32_t dst_ip, const uint8_t* src_mac) {
         arp_h->arp_op = htons(arp_op_request);
@@ -122,14 +120,17 @@ public:
         ip_h->ip_sum = 0;
         return cksum(ip_h, sizeof(ip_hdr)) == old_sum;
     }
-    void decrement_ttl     ()       {ip_h->ip_ttl--;}
-    size_t ip_data_len     () const {return m_data.size() - sizeof(ethernet_hdr);}
-    uint8_t get_ip_ttl     () const {return ip_h->ip_ttl;}
-    uint32_t get_ip_src_ip () const {return ip_h->ip_src;}
-    uint32_t get_ip_dst_ip () const {return ip_h->ip_dst;}
-    uint8_t get_ip_protocol() const {return ip_h->ip_p;}
-    uint16_t get_ip_id     () const {return ntohs(ip_h->ip_id);}
-    void set_ip_id(uint16_t id) {ip_h->ip_id = htons(id);}
+
+
+    void decrement_ttl      ()       {ip_h->ip_ttl--;}
+    size_t   ip_data_len    () const {return m_data.size() - sizeof(ethernet_hdr);}
+    uint8_t  get_ip_ttl     () const {return ip_h->ip_ttl;}
+    uint32_t get_ip_src_ip  () const {return ip_h->ip_src;}
+    uint32_t get_ip_dst_ip  () const {return ip_h->ip_dst;}
+    uint8_t  get_ip_protocol() const {return ip_h->ip_p;}
+    uint16_t get_ip_id      () const {return ntohs(ip_h->ip_id);}
+
+    void set_ip_id    (uint16_t id ) {ip_h->ip_id  = htons(id);}
     void set_ip_src_ip(uint32_t src) {ip_h->ip_src = src;}
     void set_ip_dst_ip(uint32_t dst) {ip_h->ip_dst = dst;}
 
@@ -150,6 +151,7 @@ public:
 
 
     void make_forwarded(const uint8_t* src_mac) {
+        ip_h->ip_ttl--;
         make_ip_cksum();
         // swap MAC addresses
         set_eth_dst(get_eth_src().data());

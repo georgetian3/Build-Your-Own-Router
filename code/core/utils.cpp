@@ -261,29 +261,4 @@ void print_hdrs(const Buffer& buffer)
 }
 
 
-void print_section(const ::std::string& section, char c) {
-    int n = 80 - 2 - section.length();
-
-    ::std::string half = ::std::string(n / 2, c);
-
-    std::cout << half;
-    if (n % 2) {
-        std::cout << c;
-    }
-    std::cout << ' ' << section << ' ' << half << '\n';
-}
-
-
-Buffer make_buffer(const uint8_t* data, size_t len) {
-    Buffer buffer(len);
-    memcpy(buffer.data(), data, len);
-    return buffer;
-}
-
-Buffer concat_buf(const Buffer& a, const Buffer& b) {
-    Buffer buf = a;
-    buf.insert(buf.end(), b.begin(), b.end());
-    return buf;
-}
-
 } // namespace simple_router
