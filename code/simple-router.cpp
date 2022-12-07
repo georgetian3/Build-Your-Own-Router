@@ -16,7 +16,7 @@
 
 #include "simple-router.hpp"
 #include "core/utils.hpp"
-
+#include "pdu.hpp"
 #include <fstream>
 
 
@@ -44,7 +44,7 @@ void SimpleRouter::send_or_queue(const Buffer& packet, const Interface* iface) {
 }
 
 void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface) {
-    print_section("handlePacket");
+
     //printIfaces(std::cerr);
     std::cerr << "Got packet of size " << packet.size() << " on interface " << inIface << " at " << steady_clock::now().time_since_epoch().count() / 1000000000.0 << std::endl;
     print_hdrs(packet);
@@ -223,13 +223,6 @@ SimpleRouter::SimpleRouter()
 void
 SimpleRouter::sendPacket(const Buffer& packet, const std::string& outIface)
 {
-    
-    print_section("BEGIN sendPacket");
-    std::cerr << "Sending packet of length " << packet.size() << " from iface " << outIface << std::endl;
-    print_hdrs(packet);
-    print_section("END sendPacket");
-
-
     
   m_pox->begin_sendPacket(packet, outIface);
 }

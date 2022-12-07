@@ -19,8 +19,7 @@
 #include "core/interface.hpp"
 #include "simple-router.hpp"
 
-#include <algorithm>
-#include <iostream>
+#include "pdu.hpp"
 
 namespace simple_router {
 
@@ -39,14 +38,14 @@ void ArpCache::periodicCheckArpRequestsAndCacheEntries() {
         if ((*arp_request)->nTimesSent >= MAX_SENT_TIME) {
             // send host unreachable ICMP
             for (auto packet: (*arp_request)->packets) {
-                auto outIface = m_router.findIfaceByName(packet.iface);
                 ICMP icmp(packet.packet);
-                // can't use `send_or_queue` nor arp `lookup` as it will lock, so manually swap MAC addresses
+                auto outIface = m_router.findIfaceByMac(icmp.get_eth_src());
+                // can't use `send_or_queue` nor arp `lookup` as it will lock, so manually set MAC addresses
                 icmp.make_host_unreachable(outIface->ip);
-                icmp.set_eth_src(icmp.get_eth_dst().data());
-                icmp.set_eth_dst(outIface->addr().data());
+                icmp.set_eth_dst(icmp.get_eth_src().data());
+                icmp.set_eth_src(outIface->addr.data());
                 std::cerr << "Send host unreachable" << std::endl;
-                m_router.sendPacket(icmp.data(), packet.iface);
+                m_router.sendPacket(icmp.data(), outIface->name);
             }
             arp_request = m_arpRequests.erase(arp_request);
         } else {
@@ -68,7 +67,7 @@ void ArpCache::periodicCheckArpRequestsAndCacheEntries() {
             ++entry;
         } else {
             std::cerr << "Removing cache: MAC " << macToString((*entry)->mac) << " IP: ";
-            print_addr_ip_int(ntohl((*entry)->ip));
+            ipToString((*entry)->ip);
             entry = m_cacheEntries.erase(entry);
         }
     }

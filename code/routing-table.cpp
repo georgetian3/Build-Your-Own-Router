@@ -41,9 +41,9 @@ RoutingTable::lookup(uint32_t ip) const
             return a.mask > b.mask;
         }
     );
-    for (const auto& current: entries_sorted) {
-        if (((current.mask) & (current.dest)) == ((current.mask) & ip)) {
-            return current;
+    for (const auto& entry: entries_sorted) {
+        if (((entry.mask) & (entry.dest)) == ((entry.mask) & ip)) {
+            return entry;
         }
     }
     throw std::runtime_error("Routing entry not found");
