@@ -42,10 +42,9 @@ void ArpCache::periodicCheckArpRequestsAndCacheEntries() {
                 auto outIface = m_router.findIfaceByName(packet.iface);
                 ICMP icmp(packet.packet);
                 // can't use `send_or_queue` nor arp `lookup` as it will lock, so manually swap MAC addresses
-                icmp.make_host_unreachable(16842762);
-                Buffer tmp = icmp.get_eth_src();
+                icmp.make_host_unreachable(outIface->ip);
                 icmp.set_eth_src(icmp.get_eth_dst().data());
-                icmp.set_eth_dst(tmp.data());
+                icmp.set_eth_dst(outIface->addr().data());
                 std::cerr << "Send host unreachable" << std::endl;
                 m_router.sendPacket(icmp.data(), packet.iface);
             }

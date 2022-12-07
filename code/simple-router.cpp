@@ -20,11 +20,6 @@
 #include <fstream>
 
 
-bool mac_eq(const uint8_t* a, const uint8_t* b) {
-    return !memcmp(a, b, ETHER_ADDR_LEN);
-}
-
-
 namespace simple_router {
 
 
