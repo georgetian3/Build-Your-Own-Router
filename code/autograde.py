@@ -224,6 +224,12 @@ def test_download(net):
     else:
         score += 5
 
+    if not test_download_size(net, "10M"):
+        log.error("*** Fail to download large file from http server: -10 pts")
+        details.append("*** Fail to download large file from http server: -10 pts")
+    else:
+        score += 10
+
 def test(net):
     test_ping(net)
     test_traceroute(net)
@@ -243,10 +249,10 @@ if __name__ == '__main__':
     # details = open('details.log', 'w')
     details = []
     main()
-    print ("Your tests score is {}/45 pts".format(score))
+    print ("Your tests score is {}/55 pts".format(score))
     print ("THIS IS NOT YOUR FINAL SCORE !!!")
     # details.write("Your tests score is {}/45 pts".format(score))
-    details.insert(0, "Your tests score is {}/45 pts".format(score))
+    details.insert(0, "Your tests score is {}/55 pts".format(score))
     with open("details.log", "w") as f:
     	for detail in details:
             f.write(detail + '\n')

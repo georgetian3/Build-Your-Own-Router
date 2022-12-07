@@ -30,44 +30,50 @@ namespace simple_router {
 void ArpCache::periodicCheckArpRequestsAndCacheEntries() {
 
     // FILL THIS IN
+
     
-    for (const auto& arp_request: m_arpRequests) {
-        if (steady_clock::now() - arp_request->timeSent <= seconds(1)) {
+    for (auto arp_request = m_arpRequests.begin(); arp_request != m_arpRequests.end(); ) {
+        /* if (steady_clock::now() - (*arp_request)->timeSent <= seconds(1)) {
             continue;
-        }
-        if (arp_request->nTimesSent >= MAX_SENT_TIME) {
-            for (const auto& packet: arp_request->packets) {
+        } */
+        if ((*arp_request)->nTimesSent >= MAX_SENT_TIME) {
+            // send host unreachable ICMP
+            for (auto packet: (*arp_request)->packets) {
                 auto outIface = m_router.findIfaceByName(packet.iface);
                 ICMP icmp(packet.packet);
-                icmp.make_host_unreachable(outIface->ip);
-                std::cout << "Send host unreachable\n";
-                m_router.sendPacket(icmp.data(), outIface->name);
+                // can't use `send_or_queue` nor arp `lookup` as it will lock, so manually swap MAC addresses
+                icmp.make_host_unreachable(16842762);
+                Buffer tmp = icmp.get_eth_src();
+                icmp.set_eth_src(icmp.get_eth_dst().data());
+                icmp.set_eth_dst(tmp.data());
+                std::cerr << "Send host unreachable" << std::endl;
+                m_router.sendPacket(icmp.data(), packet.iface);
             }
-            removeRequest(arp_request);
+            arp_request = m_arpRequests.erase(arp_request);
         } else {
-            arp_request->timeSent = steady_clock::now();
-            arp_request->nTimesSent++;
-            std::cout << "Resending ARP request\n";
-            auto outIface = m_router.findIfaceByName(arp_request->packets.front().iface);
+            // (re)send ARP request
+            (*arp_request)->timeSent = steady_clock::now();
+            (*arp_request)->nTimesSent++;
+            std::cerr << "Sending ARP request, time: " << (*arp_request)->nTimesSent << std::endl;
+            auto outIface = m_router.findIfaceByName((*arp_request)->packets.front().iface);
             ARP arp;
-            return;
-            arp.make_arp_request(outIface->ip, arp_request->ip, outIface->addr.data());
+            arp.make_arp_request(outIface->ip, (*arp_request)->ip, outIface->addr.data());
             m_router.sendPacket(arp.data(), outIface->name);
+            ++arp_request;
         }
     }
 
     // remove old cache entries
-    for (auto it = m_cacheEntries.begin(); it != m_cacheEntries.end();) {
-        if ((*it)->isValid) {
-            ++it;
+    for (auto entry = m_cacheEntries.begin(); entry != m_cacheEntries.end();) {
+        if ((*entry)->isValid) {
+            ++entry;
         } else {
-            std::cerr << "Removing cache: MAC " << macToString((*it)->mac) << " IP: ";
-            print_addr_ip_int(ntohl((*it)->ip));
-            it = m_cacheEntries.erase(it);
+            std::cerr << "Removing cache: MAC " << macToString((*entry)->mac) << " IP: ";
+            print_addr_ip_int(ntohl((*entry)->ip));
+            entry = m_cacheEntries.erase(entry);
         }
     }
 
-    //print_section("END CheckArp");
 
 }
 //////////////////////////////////////////////////////////////////////////
@@ -125,6 +131,7 @@ void
 ArpCache::removeRequest(const std::shared_ptr<ArpRequest>& entry)
 {
   std::lock_guard<std::mutex> lock(m_mutex);
+
   m_arpRequests.remove(entry);
 }
 

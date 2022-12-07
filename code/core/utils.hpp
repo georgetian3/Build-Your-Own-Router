@@ -88,7 +88,6 @@ protected:
     Buffer m_data;
     static const size_t min_length = 0;
 public:
-    Layer(const size_t len) {m_data = Buffer(len);}
     Layer(const Buffer& packet) {m_data = packet;}
     Buffer data() const {return m_data;}
     virtual bool verify_length() const {return m_data.size() >= min_length;};
@@ -99,10 +98,7 @@ protected:
     ethernet_hdr* eth_h;
     static const size_t min_length = sizeof(ethernet_hdr);
 public:
-    Ethernet(const size_t len): Layer(len) {}
-    Ethernet(const Buffer& packet): Layer(packet) {
-        eth_h = (ethernet_hdr*)m_data.data();
-    }
+    Ethernet(const Buffer& packet): Layer(packet) {eth_h = (ethernet_hdr*)m_data.data();}
     
     uint16_t get_eth_type() const      {return ntohs(eth_h->ether_type);}
     Buffer get_eth_src() const         {return make_buffer(eth_h->ether_shost, ETHER_ADDR_LEN);}
@@ -126,22 +122,25 @@ public:
 };
 
 class ARP: public Ethernet {
+
 protected:
     static const size_t min_length = sizeof(ethernet_hdr) + sizeof(arp_hdr);
+
     arp_hdr* arp_h;
+
     void set_arp_defaults() {
+        arp_h = (arp_hdr*)(m_data.data() + sizeof(ethernet_hdr));
         arp_h->arp_hrd = htons(arp_hrd_ethernet);
         arp_h->arp_pro = htons(ethertype_ip);
         arp_h->arp_hln = ETHER_ADDR_LEN;
         arp_h->arp_pln = sizeof(uint32_t);
         set_eth_type(ethertype_arp);
     }
+
+
 public:
-    ARP(): Ethernet(min_length) {}
-    ARP(const Buffer& packet): Ethernet(packet) {
-        arp_h = (arp_hdr*)(m_data.data() + sizeof(ethernet_hdr));
-        set_arp_defaults();
-    }
+    ARP(): ARP(Buffer(min_length)) {}
+    ARP(const Buffer& packet): Ethernet(packet) {set_arp_defaults();}
     unsigned short get_arp_opcode() const {return ntohs(arp_h->arp_op);}
     Buffer get_arp_src_mac() const    {return make_buffer(arp_h->arp_sha, ETHER_ADDR_LEN);}
     uint32_t get_arp_src_ip() const   {return arp_h->arp_sip;}
@@ -189,12 +188,8 @@ protected:
         ip_h->ip_sum = 0;
         ip_h->ip_sum = cksum(ip_h, sizeof(ip_hdr));
     }
-    void set_len() {
-        std::cerr << "set len IP len " << (m_data.size() - sizeof(ethernet_hdr)) << std::endl;
-        ip_h->ip_len = (m_data.size() - sizeof(ethernet_hdr));
-    }
 public:
-    IP(const size_t len): Ethernet(len) {}
+    IP(): IP(Buffer(min_length)) {}
     IP(const Buffer& packet): Ethernet(packet) {
         ip_h = (ip_hdr*)(m_data.data() + sizeof(ethernet_hdr));
     }
@@ -204,7 +199,8 @@ public:
         ip_h->ip_sum = 0;
         return cksum(ip_h, sizeof(ip_hdr)) == old_sum;
     }
-
+    void decrement_ttl     ()       {ip_h->ip_ttl--;}
+    size_t ip_data_len     () const {return m_data.size() - sizeof(ethernet_hdr);}
     uint8_t get_ip_ttl     () const {return ip_h->ip_ttl;}
     uint32_t get_ip_src_ip () const {return ip_h->ip_src;}
     uint32_t get_ip_dst_ip () const {return ip_h->ip_dst;}
@@ -215,56 +211,64 @@ public:
     void set_ip_dst_ip(uint32_t dst) {ip_h->ip_dst = dst;}
 
     void make_reply(const uint32_t src_ip) {
-        set_len();
-        //ip_h->ip_id = 0; //??
-        //ip_h->ip_off = 0; //??
+        ip_h->ip_len = htons(m_data.size() - sizeof(ethernet_hdr));
         set_ttl(64);
         ip_h->ip_p = ip_protocol_icmp;
         set_ip_dst_ip(get_ip_src_ip());
         set_ip_src_ip(src_ip);
         make_ip_cksum();
+
+        // swap MAC addresses
+
+        Buffer tmp = get_eth_src();
         set_eth_src(get_eth_dst().data());
+        set_eth_dst(tmp.data());
     }
 
 
     void make_forwarded(const uint8_t* src_mac) {
-        ip_h->ip_ttl--;
         make_ip_cksum();
+        // swap MAC addresses
+        set_eth_dst(get_eth_src().data());
         set_eth_src(src_mac);
     }
 
 
 };
 
+
 class ICMP: public IP {
 
 protected:
-    static const size_t min_length = sizeof(ethernet_hdr) + sizeof(ip_hdr) + sizeof(icmp_hdr);
+    static const size_t min_length = sizeof(ethernet_hdr) + sizeof(ip_hdr) + sizeof(icmp_t3_hdr);
     const size_t header_offset = sizeof(ethernet_hdr) + sizeof(ip_hdr);
-    icmp_hdr* icmp_h;
+    icmp_t3_hdr* icmp_h;
 
     void make_icmp_cksum() {
         icmp_h->icmp_sum = 0;
-        icmp_h->icmp_sum = cksum(icmp_h, m_data.size() - header_offset);
+        icmp_h->icmp_sum = cksum(icmp_h, sizeof(icmp_t3_hdr));
     }
     void add_icmp_data() {
-        // ICMP header + unused + Internet header + 64 bits (8 bytes)
-        m_data.resize(min_length + 4 + sizeof(ip_hdr) + 8, 0);
-        memmove(icmp_h + 4, ip_h, sizeof(ip_hdr) + 8);
+        size_t data_len = ip_data_len();
+        m_data.resize(min_length, 0);
+        if (data_len > ICMP_DATA_SIZE) {
+            memmove(icmp_h->data, ip_h, ICMP_DATA_SIZE);
+        } else {
+            memmove(icmp_h->data, ip_h, data_len);
+            memset(icmp_h->data + data_len, 0, ICMP_DATA_SIZE - data_len);
+        }
     }
     void make_unreachable(uint8_t type, uint8_t code, uint32_t src_ip) {
-        std::cerr << "make unreachable" << std::endl;
+        add_icmp_data();
         icmp_h->icmp_type = type;
         icmp_h->icmp_code = code;
-        //add_icmp_data();
-        m_data.resize(min_length);
         make_icmp_cksum();
         make_reply(src_ip);
     }
 public:
-    ICMP(): IP(min_length) {}
+    ICMP(): ICMP(Buffer(min_length)) {}
     ICMP(const Buffer& packet): IP(packet) {
-        icmp_h = (icmp_hdr*)(m_data.data() + header_offset);
+        icmp_h = (icmp_t3_hdr*)(m_data.data() + header_offset);
     }
     uint8_t get_icmp_type() const {return icmp_h->icmp_type;}
 
@@ -289,10 +293,11 @@ public:
     }
 
     void make_time_exceeded(const uint32_t src_ip, const uint8_t* src_mac, const uint8_t* dst_mac) {
+        add_icmp_data();
         icmp_h->icmp_type = 11;
         icmp_h->icmp_code = 0;
+        make_icmp_cksum();
         set_ttl(64);
-        add_icmp_data();
         make_reply(src_ip);
     }
 

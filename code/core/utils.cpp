@@ -171,21 +171,21 @@ void print_hdr_ip(const uint8_t* buf) {
 }
 
 /* Prints out ICMP header fields */
-void print_hdr_icmp(const uint8_t* buf) {
+void print_hdr_icmp1(const uint8_t* buf) {
   const icmp_hdr *hdr = reinterpret_cast<const icmp_hdr*>(buf);
   fprintf(stderr, "ICMP header:\n");
   fprintf(stderr, "\ttype: %d\n", hdr->icmp_type);
   fprintf(stderr, "\tcode: %d\n", hdr->icmp_code);
   fprintf(stderr, "\tchecksum: %d\n", hdr->icmp_sum);
+}
 
-  // ADDED
-  /* const icmp_hdr2 *hdr = reinterpret_cast<const icmp_hdr2*>(buf);
-  fprintf(stderr, "ICMP header:\n");
-  fprintf(stderr, "\ttype: %d\n", hdr->type);
-  fprintf(stderr, "\tcode: %d\n", hdr->code);
-  fprintf(stderr, "\tchecksum: %d\n", hdr->cksum);
-  fprintf(stderr, "\tid: %d\n", hdr->id);
-  fprintf(stderr, "\tseq num: %d\n", hdr->seq); */
+void print_hdr_icmp(const uint8_t* buf) {
+    print_hdr_icmp1(buf);
+    auto icmp_h = (icmp_t3_hdr*)(buf);
+    if (icmp_h->icmp_type == 11 || icmp_h->icmp_type == 3) {
+        std::cerr << "TLE or unreachable" << std::endl;
+        print_hdr_ip((const uint8_t*)(icmp_h->data));
+    }
 }
 
 

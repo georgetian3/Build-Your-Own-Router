@@ -39,14 +39,8 @@ void SimpleRouter::send_or_queue(const Buffer& packet, const Interface* iface) {
     IP ip(packet);
     auto arp_entry = m_arp.lookup(ip.get_ip_dst_ip());
     if (arp_entry == nullptr) {
-        std::cerr << "Destination MAC uncached" << std::endl;
-        std::cerr << "Queuing following request:" << std::endl;
-        print_hdrs(packet);
+        std::cerr << "Destination MAC uncached, queuing request" << std::endl;
         m_arp.queueRequest(ip.get_ip_dst_ip(), packet, iface->name);
-        ARP arp_request(Buffer(sizeof(ethernet_hdr) + sizeof(arp_hdr)));
-        arp_request.make_arp_request(iface->ip, ip.get_ip_dst_ip(), iface->addr.data());
-        std::cerr << "Send ARP request" << std::endl;
-        sendPacket(arp_request.data(), iface->name);
     } else {
         std::cerr << "Destination MAC known, sending to " << macToString(arp_entry->mac) << std::endl;
         ip.set_eth_dst(arp_entry->mac.data());
@@ -134,6 +128,8 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
             return;
         }
 
+
+
         bool ip_to_router = false;
         for (const auto& iface: m_ifaces) {
             if (iface.ip == ip.get_ip_dst_ip()) {
@@ -186,9 +182,7 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
 
         }
 
-
-        std::cerr << "IP to forward" << std::endl;
-
+        ip.decrement_ttl();
         if (ip.get_ip_ttl() == 0) {
             std::cerr << "TTL = 0, sending time exceeded ICMP" << std::endl;
             ICMP icmp(packet);
@@ -197,7 +191,13 @@ void SimpleRouter::handlePacket(const Buffer &packet, const std::string &inIface
             return; 
         }
 
+
+        std::cerr << "IP to forward" << std::endl;
+
         ip.make_forwarded(iface->addr.data());
+
+        
+
 
         std::cerr << "Forwarding IP packet" << std::endl;
         RoutingTableEntry next_hop;
@@ -230,6 +230,7 @@ SimpleRouter::sendPacket(const Buffer& packet, const std::string& outIface)
 {
     
     print_section("BEGIN sendPacket");
+    std::cerr << "Sending packet of length " << packet.size() << " from iface " << outIface << std::endl;
     print_hdrs(packet);
     print_section("END sendPacket");
 
